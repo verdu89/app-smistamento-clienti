@@ -2872,65 +2872,6 @@ function updateDashboardFromMain() {
   }
 }
 
-/* ==========================
- *  Helpers “globali” riutilizzabili
- * ========================== */
-function getColumnIndexes(headers) {
-  const norm = (s) => s.toString().toLowerCase().replace(/\s+/g, " ").trim();
-
-  const headerMap = new Map();
-  headers.forEach((h, i) => headerMap.set(norm(h), i));
-
-  const find = (aliases) => {
-    for (const a of aliases) {
-      const key = norm(a);
-      if (headerMap.has(key)) return headerMap.get(key);
-    }
-    // fallback: contiene
-    for (const [k, idx] of headerMap.entries()) {
-      for (const a of aliases) {
-        if (k.includes(norm(a))) return idx;
-      }
-    }
-    return -1;
-  };
-
-  return {
-    Stato: find(["Stato"]),
-    "Venditore Assegnato": find([
-      "Venditore Assegnato",
-      "Venditore",
-      "Assegnato a",
-      "Sales",
-      "Agente",
-    ]),
-    "Data e ora": find([
-      "Data e ora",
-      "Data",
-      "Data lead",
-      "Data assegnazione",
-      "Created at",
-      "Created",
-    ]),
-    "Data Preventivo": find(["Data Preventivo", "Data invio preventivo"]),
-    "Vendita Conclusa?": find([
-      "Vendita Conclusa?",
-      "Vendita Conclusa",
-      "Esito",
-      "Chiuso",
-      "Closed",
-    ]),
-    "Numero pezzi": find(["Numero pezzi", "Pezzi", "Qta", "Quantità", "Qty"]),
-    "Provenienza contatto": find([
-      "Provenienza contatto",
-      "Provenienza",
-      "Fonte",
-      "Canale",
-      "Source",
-    ]),
-  };
-}
-
 function logInfo(msg) {
   Logger.log(msg);
 }
