@@ -1535,6 +1535,9 @@ function sendWeeklyReport() {
   var clients = [];
   var totalPezzi = 0;
 
+  // 🔢 mappa totali per venditore
+  var vendorTotals = {}; // { [venditore]: { pezzi: number, clienti: number } }
+
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     var dateCell = row[colsMain["Data e ora"]];
@@ -1559,6 +1562,19 @@ function sendWeeklyReport() {
 
     if (assignedDateMidnight >= startDate && assignedDateMidnight <= endDate) {
       clients.push(row);
+
+      // ➕ accumula totali per venditore
+      var venditore = (row[colsMain["Venditore Assegnato"]] || "-")
+        .toString()
+        .trim();
+      var pezzi = parseInt(row[colsMain["Numero pezzi"]]) || 0;
+      totalPezzi += pezzi;
+
+      if (!vendorTotals[venditore]) {
+        vendorTotals[venditore] = { pezzi: 0, clienti: 0 };
+      }
+      vendorTotals[venditore].pezzi += pezzi;
+      vendorTotals[venditore].clienti += 1;
     }
   }
 
@@ -1567,10 +1583,12 @@ function sendWeeklyReport() {
     return;
   }
 
+  // 🧾 tabella dettagli clienti
   var emailBody = `
   <div style="font-family: Arial; max-width: 800px; margin: auto;">
     <h2 style="text-align:center;">📊 Riepilogo Nuovi Clienti della Settimana</h2>
     <p>🗓️ Settimana <b>#${weekNumber}</b> – dal <b>${startDate.toLocaleDateString()}</b> al <b>${endDate.toLocaleDateString()}</b></p>
+
     <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
       <thead style="background-color: #f2f2f2;">
         <tr>
@@ -1586,11 +1604,10 @@ function sendWeeklyReport() {
       </thead>
       <tbody>`;
 
-  clients.forEach((c) => {
-    const dataOra = tryParseDate(c[colsMain["Data e ora"]]);
-    const dataFormattata = dataOra ? dataOra.toLocaleDateString() : "-";
-    const pezzi = parseInt(c[colsMain["Numero pezzi"]]) || 0;
-    totalPezzi += pezzi;
+  clients.forEach(function (c) {
+    var dataOra = tryParseDate(c[colsMain["Data e ora"]]);
+    var dataFormattata = dataOra ? dataOra.toLocaleDateString() : "-";
+    var pezzi = parseInt(c[colsMain["Numero pezzi"]]) || 0;
 
     emailBody += `
       <tr>
@@ -1608,8 +1625,44 @@ function sendWeeklyReport() {
   emailBody += `
       </tbody>
     </table>
+
     <br>
-    <h3 style="text-align:right;">Totale pezzi richiesti: ${totalPezzi}</h3>
+    <h3 style="text-align:right; margin: 0;">Totale pezzi richiesti: ${totalPezzi}</h3>
+    <hr style="margin: 18px 0; border: none; border-top: 1px solid #ddd;">
+
+    <!-- 🧮 RIEPILOGO PER VENDITORE -->
+    <h3 style="margin: 8px 0 6px 0;">🧮 Riepilogo pezzi per venditore</h3>
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+      <thead style="background-color: #f9f9f9;">
+        <tr>
+          <th>Venditore</th>
+          <th>Clienti</th>
+          <th>Pezzi</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  // Ordina venditori per pezzi desc
+  Object.keys(vendorTotals)
+    .sort(function (a, b) {
+      return vendorTotals[b].pezzi - vendorTotals[a].pezzi;
+    })
+    .forEach(function (v) {
+      emailBody += `
+        <tr>
+          <td>${v}</td>
+          <td style="text-align:center;">${vendorTotals[v].clienti}</td>
+          <td style="text-align:center;"><b>${vendorTotals[v].pezzi}</b></td>
+        </tr>`;
+      Logger.log(
+        `👤 ${v}: ${vendorTotals[v].clienti} clienti, ${vendorTotals[v].pezzi} pezzi`
+      );
+    });
+
+  emailBody += `
+      </tbody>
+    </table>
+
     <p style="font-size: 10px; text-align: center; margin-top: 30px;">Impaginato per stampa su foglio A4</p>
   </div>`;
 
