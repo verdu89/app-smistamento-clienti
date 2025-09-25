@@ -142,6 +142,90 @@ function inviaRecensioniWhatsApp() {
   }
 }
 
+function inviaBenvenutiWhatsApp() {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const BOT_SERVER_URL = scriptProps.getProperty("BOT_SERVER_URL");
+
+  if (!BOT_SERVER_URL) {
+    Logger.log("❌ BOT_SERVER_URL non trovato nelle proprietà dello script!");
+    return;
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Main");
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) {
+    Logger.log("⚠️ Nessuna riga di dati trovata.");
+    return;
+  }
+
+  const headers = data[0];
+  const now = new Date();
+
+  // Trova indici colonne
+  const idxTelefono = headers.indexOf("Telefono");
+  const idxNome = headers.indexOf("Nome");
+  const idxBenvenuto = headers.indexOf("Messaggio Benvenuto");
+
+  Logger.log(
+    `📑 Indici colonne → Telefono:${idxTelefono}, Nome:${idxNome}, Benvenuto:${idxBenvenuto}`
+  );
+
+  for (let i = 1; i < data.length; i++) {
+    const telefono = data[i][idxTelefono];
+    const nome = data[i][idxNome];
+    const benvenuto = data[i][idxBenvenuto];
+
+    // ---- Controlli preliminari ----
+    if (!telefono) {
+      Logger.log(`⏭️ Riga ${i + 1}: manca il numero di telefono → salto`);
+      continue;
+    }
+    if (benvenuto) {
+      Logger.log(`⏭️ Riga ${i + 1}: benvenuto già inviato → salto`);
+      continue;
+    }
+
+    // ---- Invio richiesta al bot ----
+    const url = BOT_SERVER_URL + "/benvenuto";
+    const payload = { numero: String(telefono), nome: String(nome || "") };
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    };
+
+    Logger.log(
+      `📡 Riga ${i + 1}: invio richiesta a bot → ${JSON.stringify(payload)}`
+    );
+
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      const text = response.getContentText();
+      Logger.log(`📩 Riga ${i + 1}: risposta server → ${text}`);
+
+      const dataRes = JSON.parse(text);
+
+      if (dataRes.ok) {
+        sheet.getRange(i + 1, idxBenvenuto + 1).setValue(new Date());
+        Logger.log(`✅ Riga ${i + 1}: WA benvenuto accodato con successo`);
+      } else {
+        sheet
+          .getRange(i + 1, idxBenvenuto + 1)
+          .setValue(dataRes.error || "Errore invio");
+        Logger.log(
+          `⚠️ Riga ${i + 1}: errore server → ${dataRes.error || "Errore invio"}`
+        );
+      }
+    } catch (err) {
+      Logger.log(`❌ Riga ${i + 1}: eccezione invio → ${err}`);
+      sheet
+        .getRange(i + 1, idxBenvenuto + 1)
+        .setValue("Errore script: " + err.message);
+    }
+  }
+}
+
 function creaTriggerWhatsApp() {
   // 🔄 Rimuove eventuali trigger duplicati
   const allTriggers = ScriptApp.getProjectTriggers();
