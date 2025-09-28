@@ -16,9 +16,6 @@ function formatMailBody(obj) { // function to spit out all the keys/values from 
   return result; // once the looping is done, `result` will be one long string to put in the email body
 }*/
 
-// URL del tuo bot su Hetzner (per ora in locale usa ngrok se vuoi testare)
-// const BOT_SERVER_URL = "http://65.21.149.103:3000";
-
 function inviaRecensioniWhatsApp() {
   const scriptProps = PropertiesService.getScriptProperties();
   const BOT_SERVER_URL = scriptProps.getProperty("BOT_SERVER_URL");
@@ -226,26 +223,13 @@ function inviaBenvenutiWhatsApp() {
   }
 }
 
-function creaTriggerWhatsApp() {
-  // 🔄 Rimuove eventuali trigger duplicati
-  const allTriggers = ScriptApp.getProjectTriggers();
-  for (const t of allTriggers) {
-    if (t.getHandlerFunction() === "inviaRecensioniWhatsApp") {
-      ScriptApp.deleteTrigger(t);
-      Logger.log("🗑️ Trigger precedente eliminato");
-    }
-  }
-
-  // ⏰ Crea nuovo trigger giornaliero alle 18:00
-  ScriptApp.newTrigger("inviaRecensioniWhatsApp")
+function creaTriggerBenvenuti() {
+  ScriptApp.newTrigger("inviaBenvenutiWhatsApp")
     .timeBased()
-    .atHour(18) // ora del giorno (18:00)
-    .everyDays(1) // tutti i giorni
+    .everyMinutes(15)
     .create();
 
-  Logger.log(
-    "✅ Nuovo trigger creato: inviaRecensioniWhatsApp ogni giorno alle 18:00"
-  );
+  Logger.log("✅ Trigger creato: inviaBenvenutiWhatsApp ogni 15 minuti");
 }
 
 function importaLeadDaMetaNuovi() {
@@ -273,7 +257,17 @@ function importaLeadDaMetaNuovi() {
     );
   }
 
-  // Recupera ID/fallback già presenti
+  // 🔹 funzione per normalizzare i numeri di telefono
+  function normalizePhone(tel) {
+    if (!tel) return "";
+    let clean = String(tel).replace(/\D/g, ""); // toglie tutto tranne cifre
+    if (clean.startsWith("39") && clean.length > 10) {
+      clean = clean.substring(2); // rimuove prefisso internazionale
+    }
+    return clean;
+  }
+
+  // Recupera chiavi già presenti
   const lastRow = sheet.getLastRow();
   let existingKeys = [];
   if (lastRow > 1) {
@@ -284,16 +278,20 @@ function importaLeadDaMetaNuovi() {
       const leadId = row[idColIndex] ? row[idColIndex].toString().trim() : "";
       const nome =
         colIndexes["Nome"] !== undefined
-          ? (row[colIndexes["Nome"]] || "").toString().trim()
+          ? (row[colIndexes["Nome"]] || "").toString().trim().toLowerCase()
           : "";
       const tel =
         colIndexes["Telefono"] !== undefined
-          ? (row[colIndexes["Telefono"]] || "").toString().trim()
+          ? normalizePhone(row[colIndexes["Telefono"]])
           : "";
-      const fallbackKey = nome + "|" + tel;
+      const email =
+        colIndexes["Email"] !== undefined
+          ? (row[colIndexes["Email"]] || "").toString().trim().toLowerCase()
+          : "";
 
-      if (leadId) existingKeys.push(leadId);
-      if (fallbackKey !== "|") existingKeys.push(fallbackKey);
+      // 🔹 usa SOLO una chiave coerente
+      const uniqueKey = leadId || `${nome}|${tel}|${email}`;
+      if (uniqueKey) existingKeys.push(uniqueKey);
     });
   }
   const existingSet = new Set(existingKeys);
@@ -324,29 +322,30 @@ function importaLeadDaMetaNuovi() {
 
     const record = {};
     (lead.field_data || []).forEach((f) => {
+      // 🔴 ignora il campo "lead_status"
+      if ((f.name || "").toLowerCase() === "lead_status") {
+        return;
+      }
       record[f.name] = (f.values || []).join(", ");
     });
 
-    // Pulizia Telefono
-    let telefono = record.phone_number || "";
-    if (telefono.startsWith("+39")) {
-      telefono = telefono.substring(3).trim();
-    }
-
-    // Pulizia Provincia
-    let provincia = record.inserisci_la_provincia_di_consegna || "";
-    provincia = provincia.replace(/_/g, " ").trim();
-
-    // Luogo di consegna (fallback robusto)
+    // Pulizia campi
+    let telefono = normalizePhone(record.phone_number || "");
+    let provincia = (record.inserisci_la_provincia_di_consegna || "")
+      .replace(/_/g, " ")
+      .trim();
     const luogoConsegna = findFieldValue(lead.field_data, {
       mustInclude: ["luogo", "consegna"],
     });
-
-    // Messaggio
     const messaggio = record.descrivici_quali_sono_le_tue_esigenze || "";
 
-    // Chiave di fallback
-    const fallbackKey = (record.full_name || "").trim() + "|" + telefono;
+    // Fallback robusto
+    const fallbackKey =
+      (record.full_name || "").trim().toLowerCase() +
+      "|" +
+      telefono +
+      "|" +
+      (record.email || "").trim().toLowerCase();
 
     // Chiave finale
     const uniqueKey = leadId || fallbackKey;
@@ -382,6 +381,126 @@ function importaLeadDaMetaNuovi() {
   });
 
   Logger.log("✅ Importazione completata");
+}
+
+/**
+ * Trova il valore di un campo in base al nome, in modo robusto.
+ */
+function findFieldValue(fieldData, options) {
+  if (!fieldData || fieldData.length === 0) return "";
+
+  const normalize = (s) =>
+    s
+      .toString()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // rimuove accenti
+      .replace(/[^a-z0-9]+/g, "_") // non alfanumerici -> _
+      .replace(/^_+|_+$/g, ""); // trim _
+
+  const normMap = new Map();
+  fieldData.forEach((fd) => {
+    const keyN = normalize(fd.name || "");
+    const val = (fd.values || []).join(", ");
+    normMap.set(keyN, val);
+  });
+
+  // Match esatti
+  for (const ex of options.exactNormalized || []) {
+    if (normMap.has(ex)) return normMap.get(ex);
+  }
+
+  // Match per parole chiave
+  const must = (options.mustInclude || []).map(normalize);
+  for (const fd of fieldData) {
+    const n = normalize(fd.name || "");
+    if (must.every((tok) => n.includes(tok))) {
+      return (fd.values || []).join(", ");
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Trova il valore di un campo in base al nome, in modo robusto.
+ */
+function findFieldValue(fieldData, options) {
+  if (!fieldData || fieldData.length === 0) return "";
+
+  const normalize = (s) =>
+    s
+      .toString()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // rimuove accenti
+      .replace(/[^a-z0-9]+/g, "_") // non alfanumerici -> _
+      .replace(/^_+|_+$/g, ""); // trim _
+
+  const normMap = new Map();
+  fieldData.forEach((fd) => {
+    const keyN = normalize(fd.name || "");
+    const val = (fd.values || []).join(", ");
+    normMap.set(keyN, val);
+  });
+
+  // Match esatti normalizzati
+  for (const ex of options.exactNormalized || []) {
+    if (normMap.has(ex)) return normMap.get(ex);
+  }
+
+  // Match per parole chiave
+  const must = (options.mustInclude || []).map(normalize);
+  for (const fd of fieldData) {
+    const n = normalize(fd.name || "");
+    if (must.every((tok) => n.includes(tok))) {
+      return (fd.values || []).join(", ");
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Trova il valore di un campo in base al nome, in modo robusto.
+ * - Normalizza accenti/spazi/simboli
+ * - Prova prima match esatti normalizzati, poi match per parole chiave (mustInclude)
+ */
+function findFieldValue(fieldData, options) {
+  if (!fieldData || fieldData.length === 0) return "";
+
+  const normalize = (s) =>
+    s
+      .toString()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // rimuove accenti
+      .replace(/[^a-z0-9]+/g, "_") // non alfanumerici -> _
+      .replace(/^_+|_+$/g, ""); // trim _
+
+  // Mappa "nome_normalizzato -> value"
+  const normMap = new Map();
+  fieldData.forEach((fd) => {
+    const keyN = normalize(fd.name || "");
+    const val = (fd.values || []).join(", ");
+    normMap.set(keyN, val);
+  });
+
+  // 1) tentativo con nomi esatti normalizzati
+  for (const ex of options.exactNormalized || []) {
+    if (normMap.has(ex)) return normMap.get(ex);
+  }
+
+  // 2) fallback: include tutte le parole chiave indicate
+  const must = (options.mustInclude || []).map(normalize);
+  for (const fd of fieldData) {
+    const n = normalize(fd.name || "");
+    if (must.every((tok) => n.includes(tok))) {
+      return (fd.values || []).join(", ");
+    }
+  }
+
+  return "";
 }
 
 /**
@@ -1235,18 +1354,22 @@ function addToVendorSheet(row, sheet, colsMain, colsVendor) {
 
 function buildReviewEmail(nomeCliente) {
   const subject = "Ci racconti com’è andata? 🙌";
-  const body =
-    "Ciao " +
-    nomeCliente +
-    ",<br><br>" +
-    "grazie di cuore per averci dato fiducia! 🙏<br>" +
-    "Speriamo che il nostro intervento ti abbia lasciato soddisfatto e senza pensieri.<br><br>" +
-    "Per noi la tua opinione è preziosa: ci aiuta a migliorare ogni giorno e permette anche ad altre persone, come te, di scegliere con serenità.<br><br>" +
-    "<b>Ti basta un attimo per lasciarci una recensione 🙌</b><br><br>" +
-    "<a href='https://maps.app.goo.gl/1gM31niwMtSfPCk16' style='color:#2563eb; font-weight:bold; text-decoration:none;'>👉 Lascia la tua recensione</a><br><br>" +
-    "Il tuo feedback farà davvero la differenza per il nostro team.<br><br>" +
-    "Un sincero grazie,<br>" +
-    "<b>Il Team Saverplast 🚀</b>";
+  const body = `
+Gentile cliente,<br><br>
+grazie di cuore per averci scelto! 🙏<br>
+Siamo felici di averti aiutato e speriamo che il nostro intervento ti abbia lasciato sereno e soddisfatto.<br><br>
+La tua opinione per noi conta moltissimo: ci permette di migliorare ogni giorno e di far conoscere ad altre persone la qualità del nostro lavoro.<br><br>
+<b>Ci dedichi un minuto per lasciarci una recensione? 🙌</b><br>
+Per noi sarebbe un gesto prezioso e per te un modo semplice per darci una grande mano.<br><br>
+<a href="https://maps.app.goo.gl/1gM31niwMtSfPCk16" 
+   style="display:inline-block; padding:12px 20px; background:#2563eb; color:#fff; font-weight:bold; border-radius:8px; text-decoration:none;">
+✨ Scrivi la tua recensione ✨
+</a><br><br>
+Il tuo feedback farà davvero la differenza per il nostro team, e ci aiuterà a continuare a offrire il meglio.<br><br>
+Con gratitudine,<br>
+<b>Il Team Saverplast</b>
+`;
+
   return { subject, body };
 }
 
