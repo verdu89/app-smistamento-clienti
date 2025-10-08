@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function addToVendorSheet(row, sheet, colsMain, colsVendor) {
   logInfo("➡️ Avvio aggiunta dati a " + sheet.getName());
 
@@ -68,7 +67,6 @@ function addToVendorSheet(row, sheet, colsMain, colsVendor) {
   }
 }
 
-
 function debugVendorSheets() {
   var vendors = getVendors();
   for (var venditore in vendors) {
@@ -93,7 +91,6 @@ function debugVendorSheets() {
     }
   }
 }
-
 
 function dedupVendorsOnce() {
   var vendors = getVendors();
@@ -176,7 +173,6 @@ function dedupVendorsOnce() {
   );
 }
 
-
 function getProvinceToVendor() {
   var provinceToVendor = {
     ca: "Mircko Manconi",
@@ -187,8 +183,10 @@ function getProvinceToVendor() {
     oristano: "Cristian Piga",
     nu: "Marco Guidi",
     nuoro: "Marco Guidi",
-    ss: "Marco Guidi",
-    sassari: "Marco Guidi",
+    ss: "Cristian Piga",
+    sassari: "Cristian Piga",
+    ot: "Cristian Piga",
+    "olbia-tempio": "Cristian Piga",
   };
 
   Logger.log(
@@ -197,7 +195,6 @@ function getProvinceToVendor() {
   );
   return provinceToVendor;
 }
-
 
 function getVendorEmail(venditore) {
   var vendorEmails = {
@@ -209,7 +206,6 @@ function getVendorEmail(venditore) {
   return vendorEmails[venditore] || "newsaverplast@gmail.com"; // Email di default in caso di venditore sconosciuto
 }
 
-
 function getVendorPhone(venditore) {
   var vendorPhones = {
     "Mircko Manconi": "+39 3398123123",
@@ -220,7 +216,6 @@ function getVendorPhone(venditore) {
   return vendorPhones[venditore] || "+39 070/247362"; // Numero di default in caso di venditore sconosciuto
 }
 
-
 function getVendors() {
   return {
     "Mircko Manconi": "1mGFlFbCYy9ylVjNA9l6b855c6jlIDr6QOua2qfSjckw",
@@ -228,7 +223,6 @@ function getVendors() {
     "Marco Guidi": "1CVQSnFGNX8pGUKUABdtzwQmyCKPtuOsK8XAVbJwmUqE",
   };
 }
-
 
 function syncMainToVendors() {
   const changesLog = []; // tiene traccia di tutte le modifiche
@@ -393,25 +387,54 @@ function syncMainToVendors() {
           "📌 Assegnazione SU: '" + luogoConsegna + "' → " + venditoreNuovo
         );
       } else {
-        // === LOGICA PERSONALIZZATA PER SASSARI ===
-        var pezzi = row[colsMain["Numero pezzi"]]
-          ? parseInt(row[colsMain["Numero pezzi"]], 10)
-          : 0;
+        // === LOGICA PERSONALIZZATA PER SASSARI E ZONA OLBIA ===
 
-        if ((provincia === "ss" || provincia === "sassari") && pezzi > 7) {
+        // Normalizzo provincia e luogo consegna
+        var provinciaNorm = provincia.toLowerCase();
+        var luogoNorm = luogoConsegna.toLowerCase();
+
+        // Comuni aggiuntivi per zona Olbia
+        var comuniZonaOlbia = [
+          "olbia",
+          "golfo aranci",
+          "arzachena",
+          "porto rotondo",
+          "loiri porto san paolo",
+          "telti",
+          "palau",
+          "buddusò",
+          "tempio pausania",
+          "santa teresa gallura",
+        ];
+
+        // Se provincia è SS o Olbia-Tempio → Cristian sempre
+        if (
+          provinciaNorm === "ss" ||
+          provinciaNorm === "sassari" ||
+          provinciaNorm === "ot" ||
+          provinciaNorm.includes("olbia")
+        ) {
           venditoreNuovo = "Cristian Piga";
           Logger.log(
-            "📌 Assegnazione SS con " + pezzi + " pezzi → Cristian Piga"
-          );
-        } else {
-          venditoreNuovo = provinceToVendor[provincia] || "Cristian Piga";
-          Logger.log(
-            "📌 Assegnazione standard: Provincia '" +
+            "📌 Assegnazione diretta → Provincia '" +
               provincia +
-              "' → " +
-              venditoreNuovo
+              "' → Cristian Piga"
           );
         }
+        // Oppure se il luogo contiene un comune zona Olbia
+        else if (comuniZonaOlbia.some((comune) => luogoNorm.includes(comune))) {
+          venditoreNuovo = "Cristian Piga";
+          Logger.log(
+            "📌 Assegnazione zona Olbia → '" +
+              luogoConsegna +
+              "' → Cristian Piga"
+          );
+        } else {
+          // Altrimenti usa la logica precedente (provinceToVendor)
+          venditoreNuovo = provinceToVendor[provinciaNorm] || "Cristian Piga";
+          Logger.log("📌 Assegnazione standard → " + venditoreNuovo);
+        }
+
         // === FINE LOGICA PERSONALIZZATA ===
       }
 
@@ -518,7 +541,6 @@ function syncMainToVendors() {
   Logger.log(`Totale modifiche loggate: ${changesLog.length}`);
 }
 
-
 function syncToVendorSheet(row, venditore, vendors, colsMain) {
   if (!(venditore in vendors)) {
     logError("❌ Nessun foglio venditore trovato per: " + venditore);
@@ -552,7 +574,6 @@ function syncToVendorSheet(row, venditore, vendors, colsMain) {
     );
   }
 }
-
 
 function syncVendorsSheets(vendorsData, vendors) {
   Object.keys(vendorsData).forEach((venditore) => {
@@ -671,7 +692,6 @@ function syncVendorsSheets(vendorsData, vendors) {
     );
   });
 }
-
 
 function updateMainFromVendors() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
