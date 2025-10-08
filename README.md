@@ -1,97 +1,112 @@
-# 📦 App Smistamento Clienti
+# 📦 Smistamento Clienti
 
-Questa applicazione è uno script Google Apps Script + strumenti di supporto che permette di **gestire, smistare e monitorare i clienti** in maniera automatizzata tramite Google Sheets, Gmail e notifiche email.  
-È pensata per team commerciali che devono gestire rapidamente lead, follow-up e attività di vendita.
+_(Customer Routing & Automation System)_
 
----
-
-## 🚀 Funzionalità principali
-
-- 📋 Raccolta automatica dati da **Google Form** o input manuale su Google Sheets.
-- 🔄 Smistamento clienti ai venditori con regole di priorità.
-- 🧹 Deduplica dei record per evitare duplicati nel database.
-- ✉️ Notifiche email ai venditori e reminder automatici.
-- 📊 Dashboard di monitoraggio delle attività di vendita.
-- 🤖 Integrazione con OpenAI per analisi dei dati e supporto smart.
+Questa applicazione è realizzata interamente in **Google Apps Script** e consente di **gestire automaticamente lead, assegnarli ai venditori, inviare notifiche e richiedere recensioni** tramite Google Sheets + Gmail + WhatsApp.
 
 ---
 
-## 🛠️ Requisiti
+## 🚀 Funzionalità principali / Main Features
 
-- **Google Workspace** con accesso a Google Sheets, Gmail e Apps Script.
-- **Account OpenAI** per usare le funzionalità AI (opzionale).
-- Node.js (se si lavora su componenti locali).
+| Funzionalità IT                         | Feature EN                            |
+| --------------------------------------- | ------------------------------------- |
+| 📋 Raccolta lead da Google Sheet / Form | Collects leads from Sheets / Forms    |
+| 🔄 Smistamento automatico ai venditori  | Auto-routing to assigned vendors      |
+| 🧹 Rimozione duplicati                  | Deduplication to avoid double entries |
+| ✉️ Invio email e WhatsApp automatici    | Automatic Email & WhatsApp messages   |
+| 📊 Dashboard di monitoraggio            | Sales / Lead tracking dashboard       |
+| ⭐ Richiesta recensioni a fine lavoro   | End-of-job review requests            |
 
 ---
 
-## 📂 Struttura del progetto
+## 🛠️ Requisiti / Requirements
 
+- ✅ **Google Workspace** con accesso a Sheets + Gmail + Apps Script
+- ✅ (Opzionale) **Chiave OpenAI** salvata in _Script Properties_
+
+---
+
+## 📂 Struttura del Progetto / Project Structure
+
+SmistamentoClienti (Apps Script Project)
+├── 00_config.gs # Getter chiavi / API (es. getOpenAIKey)
+├── 01_utils.gs # Funzioni generiche riutilizzabili
+├── 02_logging.gs # Sistema log centralizzato
+├── 10_server.gs # Endpoint Webhook (doGet / doPost)
+├── 20_whatsapp.gs # Invio messaggi WhatsApp
+├── 30_email_queue.gs # Coda email e invio asincrono
+├── 31_gmail_reconcile.gs# Allineamento Gmail ↔ Main
+├── 40_meta_leads.gs # Import da Meta/Facebook
+├── 50_vendors.gs # Logica assegnazione Vendor
+├── 60_core.gs # Logica principale di smistamento
+├── 70_dashboard.gs # Aggiornamento Dashboard / Report
+├── 98_triggers_setup.gs # Creazione trigger automatici
+└── 99_trigger_handlers.gs # Funzioni chiamate dai trigger
+
+yaml
+Copia codice
+
+---
+
+## 🔑 Configurazione chiavi API (OpenAI)
+
+1. Vai su **Editor Apps Script → Project Settings → Script Properties**
+2. Aggiungi:
+
+| Key            | Value      |
+| -------------- | ---------- |
+| OPENAI_API_KEY | sk-xxxxxxx |
+
+3. Recuperabile nel codice tramite:
+
+```js
+function getOpenAIKey() {
+  return PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+}
+🔄 Flusso Principale Lead / Main Lead Flow
+🇮🇹
+
+Il lead entra nel Foglio Main
+
+avviaProgramma() lo smista al venditore corretto
+
+Parte la comunicazione automatica (Email / WhatsApp)
+
+Il contatto viene tracciato in Dashboard
+
+🇬🇧
+
+Lead is inserted into the Main sheet
+
+avviaProgramma() assigns it to the correct Vendor
+
+Automatic messaging starts (Email / WhatsApp)
+
+Lead status is tracked in Dashboard
+
+⭐ Flusso Recensioni / Review Request Flow
+Evento IT	Azione IT
+Compilazione di una riga nel foglio "Recensioni Extra"	Invio automatico richiesta recensione
+
+Event EN	Action EN
+A row is filled in "Recensioni Extra" sheet	Automatic review request is sent
+
+⚙️ Trigger Automatici / Active Triggers
+Funzione	Scopo IT	Purpose EN
+onEditInstalled	Reagisce alle modifiche nel foglio	Reacts to sheet edits
+processEmailQueue	Invia le email in attesa	Sends queued emails
+setupDailyReminderTrigger	Reminder giornalieri	Daily reminders
+setupDashboardFridayTrigger	Report settimanale	Weekly report
+createOnEditTrigger()	Crea trigger sulle modifiche	Creates onEdit trigger
+
+▶️ Test Manuali / Manual Tests
+Funzione	Cosa fa IT	What it does EN
+avviaProgramma()	Avvia lo smistamento lead	Starts full routing
+processEmailQueue()	Forza invio email	Forces email sending
+updateDashboardFromMain()	Aggiorna dashboard	Refresh dashboard
+
+🛡️ Sicurezza / Security
+✔️ Nessuna chiave API è salvata nel codice
+✔️ Le chiavi sono gestite tramite Script Properties
+✔️ Nessun file viene esposto pubblicamente
 ```
-app-smistamento-clienti/
-├── README.md
-├── .gitignore
-├── Code.gs              # Script principale per Apps Script
-├── apenai-api-key.txt   # ⚠️ File locale con chiave API (ignorato da Git)
-└── package.json         # Configurazione Node.js (se usata)
-```
-
----
-
-## 🔑 Configurazione chiavi API
-
-⚠️ **Importante:** Non salvare mai le chiavi API direttamente nel codice.  
-Puoi gestirle in sicurezza in due modi:
-
-### 🔐 Su Google Apps Script
-
-- Vai su **Editor Apps Script → Project Settings → Script properties**
-- Aggiungi una proprietà chiamata `OPENAI_API_KEY` con la tua chiave.
-- Nel codice recuperala con:
-  ```javascript
-  const apiKey =
-    PropertiesService.getScriptProperties().getProperty("OPENAI_API_KEY");
-  ```
-
-### 🔐 Su sviluppo locale (Node.js)
-
-- Crea un file `.env`:
-  ```env
-  OPENAI_API_KEY=sk-xxxxxxxx
-  ```
-- Caricalo nel codice con:
-  ```js
-  require("dotenv").config();
-  const apiKey = process.env.OPENAI_API_KEY;
-  ```
-
----
-
-## ▶️ Come avviare
-
-1. Clona il repository:
-
-   ```bash
-   git clone https://github.com/verdu89/app-smistamento-clienti.git
-   cd app-smistamento-clienti
-   ```
-
-2. Configura il progetto Apps Script:
-
-   - Apri `Code.gs` nell’editor di Google Apps Script.
-   - Collega il foglio Google desiderato.
-   - Imposta le proprietà dello script (chiavi API, email admin, ecc.).
-
-3. Testa l’applicazione su Google Sheets:
-   - Aggiungi un nuovo cliente.
-   - Verifica che venga smistato correttamente.
-   - Controlla la ricezione delle email automatiche.
-
----
-
-## 🛡️ Sicurezza
-
-- `.gitignore` è configurato per evitare di caricare file con chiavi (`apenai-api-key.txt`, `.env`, ecc.).
-- Se accidentalmente una chiave finisce nella history, **revocarla subito** e usare [git-filter-repo](https://github.com/newren/git-filter-repo).
-- Le chiavi devono sempre essere gestite tramite variabili d’ambiente o `PropertiesService`.
-
----
