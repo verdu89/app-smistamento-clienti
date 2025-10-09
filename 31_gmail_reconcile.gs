@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function buildGmailIndex_(labelNames /*, dateFrom*/) {
   const emails = new Set();
   const phones = new Set();
@@ -70,7 +69,6 @@ function buildGmailIndex_(labelNames /*, dateFrom*/) {
   );
   return { emails, phones };
 }
-
 
 function reconcileGmailWithMain() {
   const LABEL_NAME = "Richiesta Preventivo - infissipvcsardegna";
@@ -273,7 +271,6 @@ function reconcileGmailWithMain() {
     );
   }
 }
-
 
 function reportMainNotInGmail() {
   const LABEL_CANDIDATES = [

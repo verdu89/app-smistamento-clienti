@@ -3,13 +3,11 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function addToEmailQueue(to, subject, body) {
   var sheet = getEmailQueueSheet();
   sheet.appendRow([to, subject, body, 0]);
   logWarning("📌 Email messa in coda per " + to);
 }
-
 
 function buildReviewEmail(nomeCliente) {
   const subject = "Ci racconti com’è andata? 🙌";
@@ -32,7 +30,6 @@ Con gratitudine,<br>
   return { subject, body };
 }
 
-
 function getEmailQueueSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("EmailQueue");
@@ -42,7 +39,6 @@ function getEmailQueueSheet() {
   }
   return sheet;
 }
-
 
 function processEmailQueue() {
   var sheet = getEmailQueueSheet();
@@ -89,14 +85,13 @@ function processEmailQueue() {
   }
 }
 
-
 function sendEmail(to, subject, body) {
   try {
-    MailApp.sendEmail({
-      to: to,
-      subject: subject,
-      htmlBody: body,
-    });
+    const res = safeSendEmail_(to, subject, body);
+    if (res && res.maintenance) {
+      logWarning("📧 Bloccata da manutenzione: " + to + " — " + subject);
+      return;
+    }
     logInfo("📧 Email inviata a " + to);
   } catch (e) {
     logError("❌ Errore nell'invio email a " + to + ": " + e.message);

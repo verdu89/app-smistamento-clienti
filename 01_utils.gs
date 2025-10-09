@@ -374,6 +374,12 @@ function writeToLogSheet(type, message) {
 }
 
 function autoCloseOldQuotes() {
+  // ⛔ Se in manutenzione → blocca tutto
+  if (isMaintenanceOn_()) {
+    Logger.log("🚧 Manutenzione attiva — updateMainFromVendors() bloccata");
+    return;
+  }
+
   Logger.log(
     "🚀 Avvio autoCloseOldQuotes() - chiusura automatica preventivi oltre 60 giorni..."
   );

@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function inviaBenvenutiWhatsApp() {
   const scriptProps = PropertiesService.getScriptProperties();
   const BOT_SERVER_URL = scriptProps.getProperty("BOT_SERVER_URL");
@@ -62,7 +61,7 @@ function inviaBenvenutiWhatsApp() {
     );
 
     try {
-      const response = UrlFetchApp.fetch(url, options);
+      const response = safeFetch_(url, options);
       const text = response.getContentText();
       Logger.log(`📩 Riga ${i + 1}: risposta server → ${text}`);
 
@@ -87,7 +86,6 @@ function inviaBenvenutiWhatsApp() {
     }
   }
 }
-
 
 function inviaRecensioniWhatsApp() {
   const scriptProps = PropertiesService.getScriptProperties();
@@ -171,7 +169,7 @@ function inviaRecensioniWhatsApp() {
     );
 
     try {
-      const response = UrlFetchApp.fetch(url, options);
+      const response = safeFetch_(url, options);
       const text = response.getContentText();
       Logger.log(`📩 Riga ${i + 1}: risposta server → ${text}`);
 
@@ -212,19 +210,18 @@ function inviaRecensioniWhatsApp() {
   }
 }
 
-
 function normalizzaProvenienza(prov) {
-    if (!prov) return "Altro";
-    prov = prov.toString().toLowerCase().trim();
-    if (prov.includes("cagliari")) return "Showroom Cagliari";
-    if (prov.includes("macchiareddu")) return "Showroom Macchiareddu";
-    if (prov.includes("nuoro")) return "Showroom Nuoro";
-    if (prov.includes("google")) return "Google";
-    if (prov.includes("facebook")) return "Facebook";
-    if (prov.includes("instagram")) return "Instagram";
-    if (prov.includes("whatsapp")) return "Whatsapp";
-    if (prov.includes("mail") || prov.includes("email")) return "Email";
-    if (prov.includes("chiamata")) return "Chiamata";
-    if (prov.includes("passaparola")) return "Passaparola";
-    return prov.charAt(0).toUpperCase() + prov.slice(1);
-  }
+  if (!prov) return "Altro";
+  prov = prov.toString().toLowerCase().trim();
+  if (prov.includes("cagliari")) return "Showroom Cagliari";
+  if (prov.includes("macchiareddu")) return "Showroom Macchiareddu";
+  if (prov.includes("nuoro")) return "Showroom Nuoro";
+  if (prov.includes("google")) return "Google";
+  if (prov.includes("facebook")) return "Facebook";
+  if (prov.includes("instagram")) return "Instagram";
+  if (prov.includes("whatsapp")) return "Whatsapp";
+  if (prov.includes("mail") || prov.includes("email")) return "Email";
+  if (prov.includes("chiamata")) return "Chiamata";
+  if (prov.includes("passaparola")) return "Passaparola";
+  return prov.charAt(0).toUpperCase() + prov.slice(1);
+}

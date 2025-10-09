@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function doGet(e) {
   var callback = e.parameter.callback;
 
@@ -15,7 +14,6 @@ function doGet(e) {
     callback + "(" + JSON.stringify(response) + ")"
   ).setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
-
 
 function doPost(e, isJsonp = false) {
   var sheetId = "1jjA9ix4LkxAiBOKTIhgg32IBUnR5GAgWtIdIhjznTYI";

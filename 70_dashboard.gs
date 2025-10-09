@@ -43,6 +43,12 @@ function rangeCountLeads(start, end, periodMap /* weekMapLead|Vend */) {
 }
 
 function sendWeeklyReport() {
+  // ⛔ Se in manutenzione → blocca tutto
+  if (isMaintenanceOn_()) {
+    Logger.log("🚧 Manutenzione attiva — updateMainFromVendors() bloccata");
+    return;
+  }
+
   aggiornaNumeroPezziInMain(); // ✅ aggiorna campi mancanti
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -208,6 +214,12 @@ function sendWeeklyReport() {
 }
 
 function updateDashboardFromMain() {
+  // ⛔ Se in manutenzione → blocca tutto
+  if (isMaintenanceOn_()) {
+    Logger.log("🚧 Manutenzione attiva — updateMainFromVendors() bloccata");
+    return;
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Dashboard") || ss.insertSheet("Dashboard");
   // 🔄 PULIZIA COMPLETA DEL FOGLIO PRIMA DI RISCRIVERE LA DASHBOARD

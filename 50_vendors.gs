@@ -257,7 +257,7 @@ function getProvinceToVendor() {
 function getVendorEmail(venditore) {
   var vendorEmails = {
     "Mircko Manconi": "mirckox@yahoo.it",
-    "Cristian Piga": "cristianpiga@me.com",
+    "Cristian Piga": "xxcristianpiga@me.com",
     "Marco Guidi": "guidi.marco0308@libero.it",
   };
   return vendorEmails[venditore] || "newsaverplast@gmail.com";
@@ -286,6 +286,12 @@ function getVendors() {
  */
 
 function syncMainToVendors() {
+  // ⛔ Se in manutenzione → esci subito senza fare nulla
+  if (isMaintenanceOn_()) {
+    Logger.log("🚧 Manutenzione attiva — syncMainToVendors() bloccata");
+    return;
+  }
+
   const changesLog = []; // tiene traccia di tutte le modifiche (come in origine)
 
   // 🔒 Lock per evitare esecuzioni parallele
@@ -1036,6 +1042,12 @@ function setValueBypassingValidation(sheet, rowIndex, colIndex, value) {
 }
 
 function updateMainFromVendors() {
+  // ⛔ Se in manutenzione → blocca tutto
+  if (isMaintenanceOn_()) {
+    Logger.log("🚧 Manutenzione attiva — updateMainFromVendors() bloccata");
+    return;
+  }
+
   Logger.log("🔁 Avvio updateMainFromVendors() [VER. TURBO]...");
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();

@@ -124,7 +124,7 @@ function avviaProgramma() {
 
   // Se ci sono errori, invia un'email di avviso
   if (errori.length > 0) {
-    MailApp.sendEmail({
+    safeSendEmail_({
       to: emailDestinatario,
       subject: "⚠️ Errore nell'esecuzione del programma",
       body: "Si sono verificati i seguenti errori:\n\n" + errori.join("\n"),
@@ -156,9 +156,14 @@ function checkForNewRequests() {
 
       // Se vuoi, puoi passare anche il telefono all'email
       const { subject, body } = buildReviewEmail(nomeCliente, telefono); // <-- solo se modifichi la funzione
-      sendEmail(email, subject, body);
+      const result = sendEmail(email, subject, body);
 
-      // Aggiorno la data richiesta recensione
+      // ✅ Se la manutenzione blocca l’invio, NON scrivere la data
+      if (!result || result.maintenance === true || result.ok === false) {
+        continue; // passa alla prossima riga senza scrivere nulla
+      }
+
+      // ✅ Solo se effettivamente inviato, aggiorna la data
       sheet
         .getRange(i + 1, idxData + 1)
         .setValue(new Date().toLocaleDateString());
@@ -752,6 +757,12 @@ function safeDiv(a, b) {
 }
 
 function sendPersistentReminders() {
+  // ⛔ Se in manutenzione → blocca tutto
+  if (isMaintenanceOn_()) {
+    Logger.log("🚧 Manutenzione attiva — updateMainFromVendors() bloccata");
+    return;
+  }
+
   var vendors = getVendors();
   var today = new Date();
   var emailSubject = "🔔 URGENTE: Clienti in attesa di contatto!";

@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function importaLeadDaMetaNuovi() {
   const scriptProps = PropertiesService.getScriptProperties();
 
@@ -70,7 +69,7 @@ function importaLeadDaMetaNuovi() {
 
   // 1) Recupera Page Token
   const accountsUrl = `https://graph.facebook.com/v19.0/me/accounts?access_token=${SYSTEM_TOKEN}`;
-  const accountsResp = UrlFetchApp.fetch(accountsUrl);
+  const accountsResp = safeFetch_(accountsUrl);
   const accounts = JSON.parse(accountsResp.getContentText());
   const pageObj = (accounts.data || []).find((p) => p.id === PAGE_ID);
   if (!pageObj)
@@ -79,7 +78,7 @@ function importaLeadDaMetaNuovi() {
 
   // 2) Scarica i lead
   const url = `https://graph.facebook.com/v19.0/${FORM_ID}/leads?access_token=${PAGE_TOKEN}`;
-  const response = UrlFetchApp.fetch(url);
+  const response = safeFetch_(url);
   const data = JSON.parse(response.getContentText());
 
   if (!data.data || data.data.length === 0) {
