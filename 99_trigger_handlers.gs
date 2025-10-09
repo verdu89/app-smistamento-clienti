@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function onEditInstalled(e) {
   if (!e || !e.source || !e.range) return;
 
@@ -57,4 +56,40 @@ function onEditInstalled(e) {
       .getRange(row, cols["Data richiesta recensione"] + 1)
       .setValue(new Date().toLocaleDateString());
   }
+}
+
+function onEditInstalled_Vendor(e) {
+  if (!e || !e.source || !e.range) return;
+
+  var sheet = e.source.getActiveSheet();
+  if (sheet.getName() !== "Dati") return; // ✅ Solo foglio "Dati"
+
+  var editedCell = e.range;
+  var data = sheet.getDataRange().getValues();
+  var cols = getColumnIndexes(data[0]);
+
+  // Campi che tracciamo
+  var trackFields = [
+    "Stato",
+    "Note",
+    "Data Preventivo",
+    "Importo Preventivo",
+    "Vendita Conclusa?",
+    "Intestatario Contratto",
+  ];
+
+  trackFields.forEach(function (field) {
+    if (field in cols) {
+      var colIndex = cols[field] + 1; // 1-based
+      if (editedCell.getColumn() === colIndex) {
+        var tsColumn = ensureTimestampColumnAdjacentHidden(sheet, field);
+        if (tsColumn !== null) {
+          sheet
+            .getRange(editedCell.getRow(), tsColumn + 1)
+            .setValue(new Date().toISOString());
+          Logger.log(`🕒 Aggiornato timestamp per ${field}`);
+        }
+      }
+    }
+  });
 }

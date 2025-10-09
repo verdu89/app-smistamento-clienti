@@ -3,48 +3,44 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function countLeadsByCalendar(start, end, rawData, colsMap, normalizeFn) {
-    // Conta direttamente sulle righe (più preciso per range arbitrari)
-    let tot = 0;
-    for (let i = 1; i < rawData.length; i++) {
-      const d = normalizeFn(getVal(rawData[i], "Data e ora"));
-      if (d >= stripTime(start) && d <= stripTime(end)) tot++;
-    }
-    return tot;
+  // Conta direttamente sulle righe (più preciso per range arbitrari)
+  let tot = 0;
+  for (let i = 1; i < rawData.length; i++) {
+    const d = normalizeFn(getVal(rawData[i], "Data e ora"));
+    if (d >= stripTime(start) && d <= stripTime(end)) tot++;
   }
-
+  return tot;
+}
 
 function countLeadsInRange(start, end, map, isYearOrMonthMap) {
-    // Se isYearOrMonthMap == true, somma da map (monthMapLead/yearMapLead) su chiavi comprese,
-    // altrimenti non usato qui.
-    let tot = 0;
-    if (isYearOrMonthMap) {
-      // Usiamo i dati di data per sicurezza (le mappe non sono per giorno)
-      // Qui delego alla funzione che scorre il dataset puntualmente:
-      return countLeadsByCalendar(start, end, data, cols, normalizzaData);
-    }
-    return tot;
+  // Se isYearOrMonthMap == true, somma da map (monthMapLead/yearMapLead) su chiavi comprese,
+  // altrimenti non usato qui.
+  let tot = 0;
+  if (isYearOrMonthMap) {
+    // Usiamo i dati di data per sicurezza (le mappe non sono per giorno)
+    // Qui delego alla funzione che scorre il dataset puntualmente:
+    return countLeadsByCalendar(start, end, data, cols, normalizzaData);
   }
-
+  return tot;
+}
 
 function rangeCountLeads(start, end, periodMap /* weekMapLead|Vend */) {
-    // Conta sommando chiavi del map che rientrano nel range
-    let tot = 0;
-    if (periodMap === weekMapLead || periodMap === weekMapVend) {
-      // Settimane
-      for (const k of Object.keys(periodMap)) {
-        const [yy, ww] = k.split("-").map(Number);
-        const dateFromKey = weekKeyToDate(yy, ww);
-        if (dateInRange(dateFromKey, start, end)) tot += periodMap[k];
-      }
-    } else {
-      // Non usato qui, ma lasciato per simmetria
-      for (const k of Object.keys(periodMap)) tot += periodMap[k];
+  // Conta sommando chiavi del map che rientrano nel range
+  let tot = 0;
+  if (periodMap === weekMapLead || periodMap === weekMapVend) {
+    // Settimane
+    for (const k of Object.keys(periodMap)) {
+      const [yy, ww] = k.split("-").map(Number);
+      const dateFromKey = weekKeyToDate(yy, ww);
+      if (dateInRange(dateFromKey, start, end)) tot += periodMap[k];
     }
-    return tot;
+  } else {
+    // Non usato qui, ma lasciato per simmetria
+    for (const k of Object.keys(periodMap)) tot += periodMap[k];
   }
-
+  return tot;
+}
 
 function sendWeeklyReport() {
   aggiornaNumeroPezziInMain(); // ✅ aggiorna campi mancanti
@@ -211,11 +207,24 @@ function sendWeeklyReport() {
   );
 }
 
-
 function updateDashboardFromMain() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Dashboard") || ss.insertSheet("Dashboard");
-  sheet.clear();
+  // 🔄 PULIZIA COMPLETA DEL FOGLIO PRIMA DI RISCRIVERE LA DASHBOARD
+
+  // 1️⃣ Cancella ogni contenuto e formattazione
+  sheet.clear(); // Cancella valori + formattazione
+
+  // 2️⃣ Rimuovi TUTTI i grafici esistenti nel foglio
+  const existingCharts = sheet.getCharts();
+  existingCharts.forEach((chart) => sheet.removeChart(chart));
+
+  // 3️⃣ (Opzionale ma consigliato) Reset dimensioni colonne e righe
+  sheet.setColumnWidths(1, sheet.getMaxColumns(), 100);
+  sheet.setRowHeights(1, sheet.getMaxRows(), 21);
+
+  // 4️⃣ Torna alla cella A1
+  sheet.setActiveRange(sheet.getRange("A1"));
 
   const mainSheet = ss.getSheetByName("Main");
   const data = mainSheet.getDataRange().getValues();
@@ -229,96 +238,104 @@ function updateDashboardFromMain() {
   const today = stripTime(new Date());
 
   /* ==========================
-   *  Funzioni supporto locali
+   *  NUOVO PARSER DATE ROBUSTO
    * ========================== */
-  function parseCustomDate(val) {
-    if (val instanceof Date && !isNaN(val)) return stripTime(val);
-    if (typeof val === "string" && val.trim() !== "") {
-      const parsed = new Date(val);
-      if (!isNaN(parsed)) return stripTime(parsed);
+  function parseOnlyDate(val) {
+    if (val instanceof Date && !isNaN(val)) {
+      return stripTime(val);
     }
+
+    if (typeof val === "string" && val.trim() !== "") {
+      let s = val
+        .trim()
+        .replace("T", " ") // ISO T -> spazio
+        .replace("Z", "") // rimuove suffissi Z
+        .replace(/\+/g, " +") // separa timezone
+        .replace(/\./g, "/"); // converte 24.3.2025 -> 24/3/2025
+
+      const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m1) {
+        const d = Number(m1[1]),
+          M = Number(m1[2]) - 1,
+          y = Number(m1[3]);
+        const date = new Date(y, M, d);
+        if (!isNaN(date)) return stripTime(date);
+      }
+
+      const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m2) {
+        const y = Number(m2[1]),
+          M = Number(m2[2]) - 1,
+          d = Number(m2[3]);
+        const date = new Date(y, M, d);
+        if (!isNaN(date)) return stripTime(date);
+      }
+
+      const m3 = s.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2}):(\d{2})$/
+      );
+      if (m3) {
+        const d = Number(m3[1]),
+          M = Number(m3[2]) - 1,
+          y = Number(m3[3]);
+        const date = new Date(y, M, d);
+        if (!isNaN(date)) return stripTime(date);
+      }
+
+      const m4 = s.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/i
+      );
+      if (m4) {
+        let d = Number(m4[1]),
+          M = Number(m4[2]) - 1,
+          y = Number(m4[3]);
+        let h = Number(m4[4]),
+          min = Number(m4[5]);
+        let ampm = m4[7].toUpperCase();
+        if (ampm === "PM" && h < 12) h += 12;
+        if (ampm === "AM" && h == 12) h = 0;
+        const date = new Date(y, M, d);
+        if (!isNaN(date)) return stripTime(date);
+      }
+
+      const direct = new Date(s);
+      if (!isNaN(direct)) return stripTime(direct);
+    }
+
     return null;
   }
+
   function stripTime(d) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
-  function normalizzaData(val) {
-    // Se mancante/illeggibile, assegna la data di oggi per coerenza dei KPI temporali
-    return parseCustomDate(val) || stripTime(today);
-  }
-  function getWorkingDaysInRange(start, end) {
-    let days = 0;
-    const d = new Date(start);
-    while (d <= end) {
-      const day = d.getDay();
-      if (day >= 1 && day <= 5) days++;
-      d.setDate(d.getDate() + 1);
-    }
-    return Math.max(days, 1);
-  }
-  function normalizzaProvenienza(prov) {
-    if (!prov) return "Altro";
-    prov = prov.toString().toLowerCase().trim();
-    if (prov.includes("cagliari")) return "Showroom Cagliari";
-    if (prov.includes("macchiareddu")) return "Showroom Macchiareddu";
-    if (prov.includes("nuoro")) return "Showroom Nuoro";
-    if (prov.includes("google")) return "Google";
-    if (prov.includes("facebook")) return "Facebook";
-    if (prov.includes("instagram")) return "Instagram";
-    if (prov.includes("whatsapp")) return "Whatsapp";
-    if (prov.includes("mail") || prov.includes("email")) return "Email";
-    if (prov.includes("chiamata")) return "Chiamata";
-    if (prov.includes("passaparola")) return "Passaparola";
-    return prov.charAt(0).toUpperCase() + prov.slice(1);
-  }
-  function getWeekNumber(d) {
-    const _d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    _d.setUTCDate(_d.getUTCDate() + 4 - (_d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(_d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil(((_d - yearStart) / 86400000 + 1) / 7);
-    return weekNo;
-  }
-  function getLastMonday(fromDate) {
-    const d = new Date(fromDate || new Date());
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return stripTime(new Date(d.setDate(diff)));
-  }
-  function getVal(row, key) {
-    const idx = cols[key];
-    return typeof idx === "number" && idx >= 0 ? row[idx] : "";
-  }
-  function fmtPerc(n) {
-    return isFinite(n) ? (n * 100).toFixed(1) + "%" : "-";
-  }
-  function safeDiv(a, b) {
-    return b > 0 ? a / b : 0;
-  }
 
   /* ==========================
-   *  Variabili accumulo
+   *  VARIABILI ACCUMULO
    * ========================== */
   let leadTotali = 0,
+    leadAnno = 0,
+    leadMese = 0,
+    leadSettimanali = 0,
+    venditeSettimanali = 0,
     preventivi = 0,
     vendite = 0,
-    totalePezzi = 0;
-  let tempoTotaleRisposta = 0,
-    risposteValide = 0;
+    totalePezzi = 0,
+    tempoTotaleRisposta = 0,
+    risposteValide = 0,
+    leadSenzaData = 0;
 
-  const provenienze = {}; // { fonte: count }
-  const statoDistribuzione = {}; // { stato: count }
-  const venditori = {}; // { nome: {lead, preventivi, vendite, tempi[] } }
-  const venditeProvenienza = {}; // { fonte: vendite }
+  const provenienze = {};
+  const statoDistribuzione = {};
+  const venditori = {};
+  const venditeProvenienza = {};
 
-  // Raggruppamenti per trend & medie
-  const weekMapLead = {}; // { "YYYY-WW": count }
-  const weekMapVend = {}; // { "YYYY-WW": count }
-  const monthMapLead = {}; // { "YYYY-MM": count }
-  const monthMapVend = {}; // { "YYYY-MM": count }
-  const yearMapLead = {}; // { "YYYY": count }
-  const yearMapVend = {}; // { "YYYY": count }
+  const weekMapLead = {};
+  const weekMapVend = {};
+  const monthMapLead = {};
+  const monthMapVend = {};
+  const yearMapLead = {};
+  const yearMapVend = {};
 
-  // Periodi chiave
   const inizioAnno = new Date(today.getFullYear(), 0, 1);
   const inizioMese = new Date(today.getFullYear(), today.getMonth(), 1);
   const thisMon = getLastMonday(today);
@@ -327,36 +344,30 @@ function updateDashboardFromMain() {
   const prevSun = new Date(prevMon);
   prevSun.setDate(prevMon.getDate() + 6);
 
-  // Confronti (settimana precedente alla settimana chiusa)
-  const prevPrevMon = new Date(prevMon);
-  prevPrevMon.setDate(prevMon.getDate() - 7);
-  const prevPrevSun = new Date(prevPrevMon);
-  prevPrevSun.setDate(prevPrevMon.getDate() + 6);
-
-  let leadAnno = 0,
-    leadMese = 0,
-    leadSettimanali = 0;
-  let venditeSettimanali = 0;
   let primaDataLead = null;
 
   /* ==========================
-   *  Ciclo dati – normalizzazione e conteggi
+   *  CICLO DATI PRINCIPALE
    * ========================== */
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
 
+    const dataAssegRaw = parseOnlyDate(getVal(row, "Data e ora"));
+    const dataAssegnazione = dataAssegRaw ?? today;
+    if (!dataAssegRaw) leadSenzaData++;
+
+    leadTotali++;
+    totalePezzi += parseInt(getVal(row, "Numero pezzi")) || 0;
     const stato =
       (getVal(row, "Stato") || "").toString().trim() || "Non specificato";
     const venditore = (getVal(row, "Venditore Assegnato") || "")
       .toString()
       .trim();
-    const dataAssegnazione = normalizzaData(getVal(row, "Data e ora")); // <= NORMALIZZAZIONE
-    const dataPreventivo = parseCustomDate(getVal(row, "Data Preventivo")); // non forziamo default per non falsare i tempi
+    const dataPreventivo = parseOnlyDate(getVal(row, "Data Preventivo"));
     const vendConclusaStr = (getVal(row, "Vendita Conclusa?") || "")
       .toString()
       .trim()
       .toUpperCase();
-    const pezzi = parseInt(getVal(row, "Numero pezzi")) || 0;
     const provenienza = normalizzaProvenienza(
       getVal(row, "Provenienza contatto") || "Internet"
     );
@@ -365,30 +376,26 @@ function updateDashboardFromMain() {
       vendConclusaStr === "SI" ||
       (vendConclusaStr === "" && stato === "Trattativa terminata");
 
-    // KPI globali
-    leadTotali++;
-    totalePezzi += pezzi;
-
     provenienze[provenienza] = (provenienze[provenienza] || 0) + 1;
     statoDistribuzione[stato] = (statoDistribuzione[stato] || 0) + 1;
 
-    if (!primaDataLead || dataAssegnazione < primaDataLead)
-      primaDataLead = dataAssegnazione;
-    if (dataAssegnazione >= inizioAnno) leadAnno++;
-    if (dataAssegnazione >= inizioMese) leadMese++;
-    if (dataAssegnazione >= prevMon && dataAssegnazione <= prevSun)
-      leadSettimanali++;
+    if (dataAssegRaw) {
+      if (!primaDataLead || dataAssegRaw < primaDataLead)
+        primaDataLead = dataAssegRaw;
+      if (dataAssegRaw >= inizioAnno) leadAnno++;
+      if (dataAssegRaw >= inizioMese) leadMese++;
+      if (dataAssegRaw >= prevMon && dataAssegRaw <= prevSun) leadSettimanali++;
+    }
 
     if (stato === "Preventivo inviato") preventivi++;
     if (isVendita) {
       vendite++;
       venditeProvenienza[provenienza] =
         (venditeProvenienza[provenienza] || 0) + 1;
-      if (dataAssegnazione >= prevMon && dataAssegnazione <= prevSun)
+      if (dataAssegRaw && dataAssegRaw >= prevMon && dataAssegRaw <= prevSun)
         venditeSettimanali++;
     }
 
-    // Venditori (contiamo sempre la riga)
     if (venditore) {
       if (!venditori[venditore])
         venditori[venditore] = {
@@ -400,9 +407,9 @@ function updateDashboardFromMain() {
       venditori[venditore].lead++;
       if (stato === "Preventivo inviato") venditori[venditore].preventivi++;
       if (isVendita) venditori[venditore].vendite++;
-      if (dataPreventivo) {
+      if (dataPreventivo && dataAssegRaw) {
         const diff = Math.round(
-          (dataPreventivo - dataAssegnazione) / (1000 * 60 * 60 * 24)
+          (dataPreventivo - dataAssegRaw) / (1000 * 60 * 60 * 24)
         );
         if (!isNaN(diff) && diff >= 0 && diff <= 60) {
           venditori[venditore].tempi.push(diff);
@@ -412,28 +419,26 @@ function updateDashboardFromMain() {
       }
     }
 
-    // Raggruppamenti per medie e trend
-    const w = getWeekNumber(dataAssegnazione);
-    const y = dataAssegnazione.getFullYear();
-    const m = dataAssegnazione.getMonth() + 1;
-    const weekKey = `${y}-${String(w).padStart(2, "0")}`;
-    const monthKey = `${y}-${String(m).padStart(2, "0")}`;
-    const yearKey = `${y}`;
+    if (dataAssegRaw) {
+      const { week, isoYear } = getISOWeekYear(dataAssegRaw);
+      const weekKey = `${isoYear}-${String(week).padStart(2, "0")}`;
+      const monthKey = `${dataAssegRaw.getFullYear()}-${String(
+        dataAssegRaw.getMonth() + 1
+      ).padStart(2, "0")}`;
+      const yearKey = `${dataAssegRaw.getFullYear()}`;
 
-    weekMapLead[weekKey] = (weekMapLead[weekKey] || 0) + 1;
-    monthMapLead[monthKey] = (monthMapLead[monthKey] || 0) + 1;
-    yearMapLead[yearKey] = (yearMapLead[yearKey] || 0) + 1;
+      weekMapLead[weekKey] = (weekMapLead[weekKey] || 0) + 1;
+      monthMapLead[monthKey] = (monthMapLead[monthKey] || 0) + 1;
+      yearMapLead[yearKey] = (yearMapLead[yearKey] || 0) + 1;
 
-    if (isVendita) {
-      weekMapVend[weekKey] = (weekMapVend[weekKey] || 0) + 1;
-      monthMapVend[monthKey] = (monthMapVend[monthKey] || 0) + 1;
-      yearMapVend[yearKey] = (yearMapVend[yearKey] || 0) + 1;
+      if (isVendita) {
+        weekMapVend[weekKey] = (weekMapVend[weekKey] || 0) + 1;
+        monthMapVend[monthKey] = (monthMapVend[monthKey] || 0) + 1;
+        yearMapVend[yearKey] = (yearMapVend[yearKey] || 0) + 1;
+      }
     }
   }
 
-  /* ==========================
-   *  KPI Globali
-   * ========================== */
   const conversionRate =
     preventivi > 0 ? ((vendite / preventivi) * 100).toFixed(1) + "%" : "-";
   const pezziMedi =
@@ -441,7 +446,6 @@ function updateDashboardFromMain() {
   const tempoMedioRisposta =
     risposteValide > 0 ? Math.round(tempoTotaleRisposta / risposteValide) : "-";
 
-  // Medie arrivi lead – giornaliere/settimanali/mensili/annuali
   const giorniStorici = primaDataLead
     ? getWorkingDaysInRange(primaDataLead, today)
     : 1;
@@ -460,9 +464,12 @@ function updateDashboardFromMain() {
   const mediaSettimanaleStorica = (leadTotali / nSettimaneStoriche).toFixed(2);
   const mediaMensileStorica = (leadTotali / nMesiStorici).toFixed(2);
   const mediaAnnualeStorica = (leadTotali / nAnniStorici).toFixed(2);
+  // ===== Confronti settimana chiusa vs settimana precedente =====
+  const prevPrevMon = new Date(prevMon);
+  prevPrevMon.setDate(prevMon.getDate() - 7);
+  const prevPrevSun = new Date(prevPrevMon);
+  prevPrevSun.setDate(prevPrevMon.getDate() + 6);
 
-  // Confronti vs periodo precedente
-  // Settimana chiusa vs settimana precedente
   const settLeadPrevPrev = rangeCountLeads(
     prevPrevMon,
     prevPrevSun,
@@ -473,49 +480,46 @@ function updateDashboardFromMain() {
     prevPrevSun,
     weekMapVend
   );
-  const settConvPrev =
-    leadSettimanali > 0 ? venditeSettimanali / leadSettimanali : 0;
-  const settConvPrevPrev =
-    settLeadPrevPrev > 0 ? settVendPrevPrev / settLeadPrevPrev : 0;
 
-  // Mese (MTD) vs mese precedente allo stesso numero di giorni lavorativi
+  // ===== Confronti MTD/YTD allineati per giorni lavorativi =====
   const prevMonth = new Date(inizioMese);
   prevMonth.setMonth(prevMonth.getMonth() - 1);
-  const endMTD = today; // fino ad oggi
+  const endMTD = today;
   const giorniLavorativiMTD = getWorkingDaysInRange(inizioMese, endMTD);
   const endPrevMonthAligned = alignPrevPeriodEnd(
     prevMonth,
-    giorniLavorativiMTD
+    giorniLavorativiMTD,
+    "month"
   );
-  const leadsMTD = countLeadsInRange(inizioMese, endMTD, monthMapLead, true);
+
+  const leadsMTD = countLeadsByCalendar(inizioMese, endMTD, data, cols);
   const leadsPrevAligned = countLeadsByCalendar(
     prevMonth,
     endPrevMonthAligned,
     data,
-    cols,
-    normalizzaData
+    cols
   );
 
-  // Anno (YTD) vs anno precedente allo stesso numero di giorni lavorativi
-  const prevYear = new Date(inizioAnno);
+  const inizioAnnoCorrente = inizioAnno;
+  const prevYear = new Date(inizioAnnoCorrente);
   prevYear.setFullYear(prevYear.getFullYear() - 1);
-  const giorniLavorativiYTD = getWorkingDaysInRange(inizioAnno, today);
+  const giorniLavorativiYTD = getWorkingDaysInRange(inizioAnnoCorrente, today);
   const endPrevYearAligned = alignPrevPeriodEnd(
     prevYear,
     giorniLavorativiYTD,
     "year"
   );
-  const leadsYTD = countLeadsInRange(inizioAnno, today, yearMapLead, true);
+
+  const leadsYTD = countLeadsByCalendar(inizioAnnoCorrente, today, data, cols);
   const leadsPrevYearAligned = countLeadsByCalendar(
     prevYear,
     endPrevYearAligned,
     data,
-    cols,
-    normalizzaData
+    cols
   );
 
   /* ==========================
-   *  Scrittura DASHBOARD
+   *  SCRITTURA DASHBOARD
    * ========================== */
   // Titolo
   sheet
@@ -539,7 +543,7 @@ function updateDashboardFromMain() {
     .setFontWeight("bold");
   sheet.appendRow([" "]);
   sheet
-    .getRange(sheet.getLastRow() + 1, 2, 1, 6)
+    .getRange(sheet.getLastRow() + 1, 2, 1, 7)
     .setValues([
       [
         "Totale Lead",
@@ -548,10 +552,11 @@ function updateDashboardFromMain() {
         "Conversion Rate",
         "Tempo medio risposta (gg)",
         "Pezzi medi/Lead",
+        "Lead con data non leggibile",
       ],
     ]);
   sheet
-    .getRange(sheet.getLastRow() + 1, 2, 1, 6)
+    .getRange(sheet.getLastRow() + 1, 2, 1, 7)
     .setValues([
       [
         leadTotali,
@@ -560,22 +565,23 @@ function updateDashboardFromMain() {
         conversionRate,
         tempoMedioRisposta,
         pezziMedi,
+        leadSenzaData,
       ],
     ]);
   sheet
-    .getRange(sheet.getLastRow() - 1, 2, 1, 6)
+    .getRange(sheet.getLastRow() - 1, 2, 1, 7)
     .setFontWeight("bold")
     .setBackground("#0b5394")
     .setFontColor("white")
     .setHorizontalAlignment("center");
   sheet
-    .getRange(sheet.getLastRow(), 2, 1, 6)
+    .getRange(sheet.getLastRow(), 2, 1, 7)
     .setFontWeight("bold")
     .setBackground("#cfe2f3")
     .setHorizontalAlignment("center");
   sheet.appendRow([" "]);
 
-  // Medie arrivi lead – giornaliere / settimanali / mensili / annuali
+  // Medie Arrivi Lead
   sheet
     .getRange(sheet.getLastRow() + 1, 2)
     .setValue("🟡 Medie Arrivi Lead")
@@ -621,7 +627,16 @@ function updateDashboardFromMain() {
     .setHorizontalAlignment("center");
   sheet.appendRow([" "]);
 
-  // Riepilogo settimana chiusa (prevMon - prevSun) + confronto
+  // Riepilogo settimana chiusa
+  const convSett =
+    leadSettimanali > 0
+      ? ((venditeSettimanali / leadSettimanali) * 100).toFixed(1) + "%"
+      : "-";
+  const convSettPrev =
+    settLeadPrevPrev > 0
+      ? ((settVendPrevPrev / settLeadPrevPrev) * 100).toFixed(1) + "%"
+      : "-";
+
   sheet
     .getRange(sheet.getLastRow() + 1, 2)
     .setValue(
@@ -631,14 +646,6 @@ function updateDashboardFromMain() {
     )
     .setFontWeight("bold");
   sheet.appendRow([" "]);
-  const convSett =
-    leadSettimanali > 0
-      ? ((venditeSettimanali / leadSettimanali) * 100).toFixed(1) + "%"
-      : "-";
-  const convSettPrev =
-    settLeadPrevPrev > 0
-      ? ((settVendPrevPrev / settLeadPrevPrev) * 100).toFixed(1) + "%"
-      : "-";
   sheet
     .getRange(sheet.getLastRow() + 1, 2, 1, 6)
     .setValues([
@@ -690,7 +697,10 @@ function updateDashboardFromMain() {
 
   const convStorico =
     leadTotali > 0 ? ((vendite / leadTotali) * 100).toFixed(1) + "%" : "-";
-  const mediaStorica = (leadTotali / giorniStorici).toFixed(2);
+  const mediaStorica = (
+    leadTotali /
+    (primaDataLead ? getWorkingDaysInRange(primaDataLead, today) : 1)
+  ).toFixed(2);
   const convAnno =
     leadAnno > 0
       ? (
@@ -717,8 +727,12 @@ function updateDashboardFromMain() {
       ? ((venditeSettimanali / leadSettimanali) * 100).toFixed(1) + "%"
       : "-";
 
-  const mediaAnno = (leadAnno / giorniAnno).toFixed(2);
-  const mediaMese = (leadMese / giorniMese).toFixed(2);
+  const mediaAnno = (
+    leadAnno / getWorkingDaysInRange(inizioAnno, today)
+  ).toFixed(2);
+  const mediaMese = (
+    leadMese / getWorkingDaysInRange(inizioMese, today)
+  ).toFixed(2);
   const mediaSett = (leadSettimanali / 5).toFixed(2);
 
   sheet.appendRow(["Storico", leadTotali, vendite, convStorico, mediaStorica]);
@@ -761,7 +775,7 @@ function updateDashboardFromMain() {
     .setFontWeight("bold");
   sheet.appendRow([" "]);
 
-  // Confronti MTD e YTD (lead)
+  // Confronti Lead (MTD/YTD)
   sheet
     .getRange(sheet.getLastRow() + 1, 2)
     .setValue("🔵 Confronti Lead (MTD/YTD vs periodo allineato)")
@@ -779,19 +793,27 @@ function updateDashboardFromMain() {
       ],
     ]);
   const deltaMTD = leadsMTD - leadsPrevAligned;
+  const deltaYTDPerc = fmtPerc(
+    safeDiv(leadsYTD - leadsPrevYearAligned, leadsPrevYearAligned)
+  );
   const deltaMTDPerc = fmtPerc(safeDiv(deltaMTD, leadsPrevAligned));
-  const deltaYTD = leadsYTD - leadsPrevYearAligned;
-  const deltaYTDPerc = fmtPerc(safeDiv(deltaYTD, leadsPrevYearAligned));
+
   sheet
     .getRange(sheet.getLastRow() + 1, 2, 1, 5)
     .setValues([["MTD", leadsMTD, leadsPrevAligned, deltaMTD, deltaMTDPerc]]);
   sheet
     .getRange(sheet.getLastRow() + 1, 2, 1, 5)
     .setValues([
-      ["YTD", leadsYTD, leadsPrevYearAligned, deltaYTD, deltaYTDPerc],
+      [
+        "YTD",
+        leadsYTD,
+        leadsPrevYearAligned,
+        leadsYTD - leadsPrevYearAligned,
+        deltaYTDPerc,
+      ],
     ]);
   sheet
-    .getRange(sheet.getLastRow() - 2, 2, 2, 5)
+    .getRange(sheet.getLastRow() - 2, 2, 3, 5)
     .setBackground("#d9e1f2")
     .setHorizontalAlignment("center")
     .setFontWeight("bold");
@@ -871,14 +893,12 @@ function updateDashboardFromMain() {
     .setHorizontalAlignment("center");
   if (vendArray.length > 0)
     sheet
-      .getRange(vendStart, 2, vendArray.length, 7)
+      .getRange(vendStart, 2, vendArray.length + 1, 7)
       .setBackground("#f3f3f3")
       .setHorizontalAlignment("center");
   sheet.appendRow([" "]);
 
-  /* ==========================
-   *  Grafici
-   * ========================== */
+  // ====== Grafici ======
   let chartStart = sheet.getLastRow() + 5;
   sheet
     .getRange(chartStart, 2)
@@ -952,74 +972,139 @@ function updateDashboardFromMain() {
     sheet.insertChart(chart3);
   }
 
+  // === BEGIN TREND 12 SETTIMANE  ===
+
   // 4) Trend ultime 12 settimane (COLUMN, Lead + Vendite)
-  const trendRow = vendRow + vendKeys.length + 10;
+  const trendRow = sheet.getLastRow() + 2;
   sheet
     .getRange(trendRow, 2)
     .setValue("📉 Trend – Ultime 12 settimane")
     .setFontWeight("bold");
 
-  const sortedWeeks = Object.keys(weekMapLead).sort(sortPeriodKeys);
-  const last12Weeks = sortedWeeks.slice(-12);
+  // Calcola la settimana corrente
+  const currentDate = new Date();
+  const currentWeekNumber = getWeekNumber(currentDate);
+  const currentYear = currentDate.getFullYear();
+
+  // Costruisce elenco delle ultime 12 settimane continue
+  const last12WeeksKeys = [];
+  let wYear = currentYear;
+  let wNum = currentWeekNumber;
+
+  for (let i = 0; i < 12; i++) {
+    const key = `${wYear}-${String(wNum).padStart(2, "0")}`;
+    last12WeeksKeys.unshift(key);
+    wNum--;
+    if (wNum <= 0) {
+      wYear--;
+      wNum = 52; // Assunzione ISO semplice
+    }
+  }
+
+  // Calcola intervallo per il titolo (prima e ultima settimana)
+  const firstKey = last12WeeksKeys[0];
+  const lastKey = last12WeeksKeys[last12WeeksKeys.length - 1];
+
   const tableWeekRow = trendRow + 2;
   sheet
     .getRange(tableWeekRow, 2, 1, 3)
     .setValues([["Settimana", "Lead", "Vendite"]]);
-  last12Weeks.forEach((wk, i) => {
+
+  last12WeeksKeys.forEach((wk, i) => {
     sheet
       .getRange(tableWeekRow + i + 1, 2, 1, 3)
       .setValues([[wk, weekMapLead[wk] || 0, weekMapVend[wk] || 0]]);
   });
+
   sheet
     .getRange(tableWeekRow, 2, 1, 3)
     .setFontWeight("bold")
     .setBackground("#cfe2f3");
-  if (last12Weeks.length > 0) {
+
+  // Inserimento grafico aggiornato con intervallo
+  if (last12WeeksKeys.length > 0) {
     const chart4 = sheet
       .newChart()
       .setChartType(Charts.ChartType.COLUMN)
-      .addRange(sheet.getRange(tableWeekRow, 2, last12Weeks.length + 1, 3))
+      .addRange(sheet.getRange(tableWeekRow, 2, last12WeeksKeys.length + 1, 3))
       .setPosition(tableWeekRow, 6, 0, 0)
-      .setOption("title", "Lead & Vendite – Ultime 12 settimane")
+      .setOption(
+        "title",
+        `Lead & Vendite – Ultime 12 settimane (${firstKey} → ${lastKey})`
+      )
       .build();
     sheet.insertChart(chart4);
   }
 
+  // === END TREND 12 SETTIMANE ===
+
+  // === BEGIN TREND 12 MESI (SOSTITUISCI DA QUI) ===
+
   // 5) Trend ultimi 12 mesi (COLUMN, Lead + Vendite)
-  const monthTrendRow = tableWeekRow + last12Weeks.length + 10;
+  const monthTrendRow = sheet.getLastRow() + 2;
   sheet
     .getRange(monthTrendRow, 2)
     .setValue("📉 Trend – Ultimi 12 mesi")
     .setFontWeight("bold");
 
-  const sortedMonths = Object.keys(monthMapLead).sort(sortPeriodKeys);
-  const last12Months = sortedMonths.slice(-12);
+  // Calcola mese corrente
+  const todayDate = new Date();
+  let mYear = todayDate.getFullYear();
+  let mNum = todayDate.getMonth() + 1;
+
+  // Costruisce elenco ultimi 12 mesi consecutivi
+  const last12MonthsKeys = [];
+  for (let i = 0; i < 12; i++) {
+    const key = `${mYear}-${String(mNum).padStart(2, "0")}`;
+    last12MonthsKeys.unshift(key);
+    mNum--;
+    if (mNum <= 0) {
+      mYear--;
+      mNum = 12;
+    }
+  }
+
+  // Intervallo per il titolo
+  const firstMonthKey = last12MonthsKeys[0];
+  const lastMonthKey = last12MonthsKeys[last12MonthsKeys.length - 1];
+
   const tableMonthRow = monthTrendRow + 2;
   sheet
     .getRange(tableMonthRow, 2, 1, 3)
     .setValues([["Mese", "Lead", "Vendite"]]);
-  last12Months.forEach((mk, i) => {
+
+  last12MonthsKeys.forEach((mk, i) => {
     sheet
       .getRange(tableMonthRow + i + 1, 2, 1, 3)
       .setValues([[mk, monthMapLead[mk] || 0, monthMapVend[mk] || 0]]);
   });
+
   sheet
     .getRange(tableMonthRow, 2, 1, 3)
     .setFontWeight("bold")
     .setBackground("#d9ead3");
-  if (last12Months.length > 0) {
+
+  // Inserimento grafico aggiornato con intervallo
+  if (last12MonthsKeys.length > 0) {
     const chart5 = sheet
       .newChart()
       .setChartType(Charts.ChartType.COLUMN)
-      .addRange(sheet.getRange(tableMonthRow, 2, last12Months.length + 1, 3))
+      .addRange(
+        sheet.getRange(tableMonthRow, 2, last12MonthsKeys.length + 1, 3)
+      )
       .setPosition(tableMonthRow, 6, 0, 0)
-      .setOption("title", "Lead & Vendite – Ultimi 12 mesi")
+      .setOption(
+        "title",
+        `Lead & Vendite – Ultimi 12 mesi (${firstMonthKey} → ${lastMonthKey})`
+      )
       .build();
     sheet.insertChart(chart5);
   }
 
+  // === END TREND 12 MESI ===
+
   // Executive Summary
-  const summaryRow = tableMonthRow + last12Months.length + 10;
+  const summaryRow = tableMonthRow + last12MonthsKeys.length + 10;
   sheet
     .getRange(summaryRow, 2)
     .setValue("🟣 Executive Summary")
@@ -1084,13 +1169,12 @@ function updateDashboardFromMain() {
   logInfo("✅ Dashboard Premium aggiornata con successo");
 
   /* ==========================
-   *  Funzioni di appoggio interne (con accesso a variabili locali)
+   *  FUNZIONI DI SUPPORTO
    * ========================== */
   function fmtDate(d) {
     return Utilities.formatDate(d, Session.getScriptTimeZone(), "dd/MM/yyyy");
   }
   function sortPeriodKeys(a, b) {
-    // Ordina "YYYY-XX" correttamente
     const [ya, xa] = a.split("-").map(Number);
     const [yb, xb] = b.split("-").map(Number);
     return ya === yb ? xa - xb : ya - yb;
@@ -1101,47 +1185,36 @@ function updateDashboardFromMain() {
   function dateInRange(d, start, end) {
     return d >= stripTime(start) && d <= stripTime(end);
   }
-  function rangeCountLeads(start, end, periodMap /* weekMapLead|Vend */) {
-    // Conta sommando chiavi del map che rientrano nel range
+  function rangeCountLeads(start, end, periodMap) {
     let tot = 0;
-    if (periodMap === weekMapLead || periodMap === weekMapVend) {
-      // Settimane
-      for (const k of Object.keys(periodMap)) {
-        const [yy, ww] = k.split("-").map(Number);
-        const dateFromKey = weekKeyToDate(yy, ww);
-        if (dateInRange(dateFromKey, start, end)) tot += periodMap[k];
-      }
-    } else {
-      // Non usato qui, ma lasciato per simmetria
-      for (const k of Object.keys(periodMap)) tot += periodMap[k];
+    for (const k of Object.keys(periodMap)) {
+      const [yy, ww] = k.split("-").map(Number);
+      const dateFromKey = weekKeyToDate(yy, ww); // lunedì ISO
+      if (dateInRange(dateFromKey, start, end)) tot += periodMap[k];
     }
     return tot;
   }
-  function weekKeyToDate(year, week) {
-    // Ritorna il lunedì di quella settimana ISO
-    const simple = new Date(year, 0, 1 + (week - 1) * 7);
-    const dow = simple.getDay();
+  function weekKeyToDate(isoYear, isoWeek) {
+    const simple = new Date(Date.UTC(isoYear, 0, 1 + (isoWeek - 1) * 7));
+    const dow = simple.getUTCDay() || 7;
     const ISOweekStart = new Date(simple);
-    const diff =
-      dow <= 4 ? simple.getDate() - dow + 1 : simple.getDate() + 8 - dow;
-    ISOweekStart.setDate(diff);
-    return stripTime(ISOweekStart);
+    ISOweekStart.setUTCDate(simple.getUTCDate() - dow + 1);
+    return stripTime(
+      new Date(
+        ISOweekStart.getUTCFullYear(),
+        ISOweekStart.getUTCMonth(),
+        ISOweekStart.getUTCDate()
+      )
+    );
   }
-  function alignPrevPeriodEnd(
-    prevPeriodStart,
-    workingDaysToMatch,
-    span /* "month"|"year" */
-  ) {
-    // Calcola la data di fine del periodo precedente in modo da avere lo stesso # di giorni lavorativi
+  function alignPrevPeriodEnd(prevPeriodStart, workingDaysToMatch, span) {
     const start = stripTime(prevPeriodStart);
-    // se span è "year", fine base = 31/12 prev year; se mese, ultimo giorno del mese precedente
     let theoreticalEnd;
     if (span === "year") {
       theoreticalEnd = new Date(start.getFullYear(), 11, 31);
     } else {
       theoreticalEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
     }
-    // Trova la data che garantisce lo stesso numero di giorni lavorativi
     let end = new Date(start);
     let count = 0;
     while (end <= theoreticalEnd && count < workingDaysToMatch) {
@@ -1152,24 +1225,69 @@ function updateDashboardFromMain() {
     }
     return stripTime(end);
   }
-  function countLeadsInRange(start, end, map, isYearOrMonthMap) {
-    // Se isYearOrMonthMap == true, somma da map (monthMapLead/yearMapLead) su chiavi comprese,
-    // altrimenti non usato qui.
+  function countLeadsByCalendar(start, end, rawData, colsMap) {
     let tot = 0;
-    if (isYearOrMonthMap) {
-      // Usiamo i dati di data per sicurezza (le mappe non sono per giorno)
-      // Qui delego alla funzione che scorre il dataset puntualmente:
-      return countLeadsByCalendar(start, end, data, cols, normalizzaData);
+    for (let i = 1; i < rawData.length; i++) {
+      const d = parseOnlyDate(getVal(rawData[i], "Data e ora"));
+      if (d && d >= stripTime(start) && d <= stripTime(end)) tot++;
     }
     return tot;
   }
-  function countLeadsByCalendar(start, end, rawData, colsMap, normalizeFn) {
-    // Conta direttamente sulle righe (più preciso per range arbitrari)
-    let tot = 0;
-    for (let i = 1; i < rawData.length; i++) {
-      const d = normalizeFn(getVal(rawData[i], "Data e ora"));
-      if (d >= stripTime(start) && d <= stripTime(end)) tot++;
+  function getWorkingDaysInRange(start, end) {
+    let days = 0;
+    const d = new Date(start);
+    while (d <= end) {
+      const day = d.getDay();
+      if (day >= 1 && day <= 5) days++;
+      d.setDate(d.getDate() + 1);
     }
-    return tot;
+    return Math.max(days, 1);
+  }
+  function normalizzaProvenienza(prov) {
+    if (!prov) return "Altro";
+    prov = prov.toString().toLowerCase().trim();
+    if (prov.includes("cagliari")) return "Showroom Cagliari";
+    if (prov.includes("macchiareddu")) return "Showroom Macchiareddu";
+    if (prov.includes("nuoro")) return "Showroom Nuoro";
+    if (prov.includes("google")) return "Google";
+    if (prov.includes("facebook")) return "Facebook";
+    if (prov.includes("instagram")) return "Instagram";
+    if (prov.includes("whatsapp")) return "Whatsapp";
+    if (prov.includes("mail") || prov.includes("email")) return "Email";
+    if (prov.includes("chiamata")) return "Chiamata";
+    if (prov.includes("passaparola")) return "Passaparola";
+    return prov.charAt(0).toUpperCase() + prov.slice(1);
+  }
+  function getISOWeekYear(d) {
+    const _d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    _d.setUTCDate(_d.getUTCDate() + 4 - (_d.getUTCDay() || 7));
+    const isoYear = _d.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+    const week = Math.ceil(((_d - yearStart) / 86400000 + 1) / 7);
+    return { week, isoYear };
+  }
+  function getLastMonday(fromDate) {
+    const d = new Date(fromDate || new Date());
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return stripTime(new Date(d.setDate(diff)));
+  }
+  function getVal(row, key) {
+    const idx = cols[key];
+    return typeof idx === "number" && idx >= 0 ? row[idx] : "";
+  }
+  function fmtPerc(n) {
+    return isFinite(n) ? (n * 100).toFixed(1) + "%" : "-";
+  }
+  function safeDiv(a, b) {
+    return b > 0 ? a / b : 0;
+  }
+  function getColumnIndexes(hdrs) {
+    const map = {};
+    for (let c = 0; c < hdrs.length; c++) {
+      const name = (hdrs[c] || "").toString().trim();
+      if (name) map[name] = c;
+    }
+    return map;
   }
 }

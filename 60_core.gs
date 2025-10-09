@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function addMultipleColumnsToMain(sheet, columnNames) {
   var headers = sheet.getDataRange().getValues()[0];
   var existingColumns = new Set(headers); // 🔹 Contiene le colonne già presenti
@@ -24,7 +23,6 @@ function addMultipleColumnsToMain(sheet, columnNames) {
     }
   });
 }
-
 
 function aggiornaNumeroPezziInMain() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -75,33 +73,34 @@ function aggiornaNumeroPezziInMain() {
   );
 }
 
-
 function alignPrevPeriodEnd(
-    prevPeriodStart,
-    workingDaysToMatch,
-    span /* "month"|"year" */
-  ) {
-    // Calcola la data di fine del periodo precedente in modo da avere lo stesso # di giorni lavorativi
-    const start = stripTime(prevPeriodStart);
-    // se span è "year", fine base = 31/12 prev year; se mese, ultimo giorno del mese precedente
-    let theoreticalEnd;
-    if (span === "year") {
-      theoreticalEnd = new Date(start.getFullYear(), 11, 31);
-    } else {
-      theoreticalEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-    }
-    // Trova la data che garantisce lo stesso numero di giorni lavorativi
-    let end = new Date(start);
-    let count = 0;
-    while (end <= theoreticalEnd && count < workingDaysToMatch) {
-      const day = end.getDay();
-      if (day >= 1 && day <= 5) count++;
-      if (count >= workingDaysToMatch) break;
-      end.setDate(end.getDate() + 1);
-    }
-    return stripTime(end);
+  prevPeriodStart,
+  workingDaysToMatch,
+  span /* "month"|"year" */
+) {
+  // Calcola la data di fine del periodo precedente in modo da avere lo stesso # di giorni lavorativi
+  const start = stripTime(prevPeriodStart);
+
+  // Se span è "year", fine base = 31/12 prev year; se mese, ultimo giorno del mese precedente
+  let theoreticalEnd;
+  if (span === "year") {
+    theoreticalEnd = new Date(start.getFullYear(), 11, 31);
+  } else {
+    theoreticalEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
   }
 
+  // Trova la data che garantisce lo stesso numero di giorni lavorativi
+  let end = new Date(start);
+  let count = 0;
+  while (end <= theoreticalEnd && count < workingDaysToMatch) {
+    const day = end.getDay();
+    if (day >= 1 && day <= 5) count++;
+    if (count >= workingDaysToMatch) break;
+    end.setDate(end.getDate() + 1);
+  }
+
+  return stripTime(end);
+}
 
 function avviaProgramma() {
   var emailDestinatario = "newsaverplast@gmail.com"; // Indirizzo email per le notifiche
@@ -132,7 +131,6 @@ function avviaProgramma() {
     });
   }
 }
-
 
 function checkForNewRequests() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -167,7 +165,6 @@ function checkForNewRequests() {
     }
   }
 }
-
 
 function createBackup(sheet) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -206,7 +203,6 @@ function createBackup(sheet) {
   Logger.log("📁 Backup creato: " + backupSheetName);
 }
 
-
 function debugLastProcessedRow() {
   var scriptProperties = PropertiesService.getScriptProperties(); // Definizione della variabile
   var lastProcessedRow = scriptProperties.getProperty("lastProcessedRow");
@@ -220,7 +216,6 @@ function debugLastProcessedRow() {
   }
 }
 
-
 function debugMainSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var mainSheet = ss.getSheetByName("Main");
@@ -228,13 +223,11 @@ function debugMainSheet() {
   Logger.log("📌 Dati dal foglio Main: " + JSON.stringify(data.slice(0, 5))); // Mostra le prime 5 righe
 }
 
-
 function dedupAllContacts() {
   dedupMainOnce();
   dedupVendorsOnce();
   Logger.log("✅ Dedup completa su Main e fogli venditori.");
 }
-
 
 function dedupEmailInRichiestaPreventivo_DELETE_DUPLICATES() {
   const LABEL_NAME = "Richiesta Preventivo - infissipvcsardegna";
@@ -352,7 +345,6 @@ function dedupEmailInRichiestaPreventivo_DELETE_DUPLICATES() {
   );
 }
 
-
 function dedupMainOnce() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName("Main");
@@ -411,7 +403,6 @@ function dedupMainOnce() {
   );
 }
 
-
 function findFieldValue(fieldData, options) {
   if (!fieldData || fieldData.length === 0) return "";
 
@@ -449,17 +440,22 @@ function findFieldValue(fieldData, options) {
   return "";
 }
 
-
-function formatMailBody(obj) { // function to spit out all the keys/values from the form in HTML
+function formatMailBody(obj) {
+  // function to spit out all the keys/values from the form in HTML
   var result = "";
-  for (var key in obj) { // loop over the object passed to the function
-    result += "<h5 style='text-transform: capitalize; margin-bottom: 0'>" + key + "</h5><div>" + obj[key] + "</div>";
-    // for every key, concatenate an `<h4 />`/`<div />` pairing of the key name and its value, 
+  for (var key in obj) {
+    // loop over the object passed to the function
+    result +=
+      "<h5 style='text-transform: capitalize; margin-bottom: 0'>" +
+      key +
+      "</h5><div>" +
+      obj[key] +
+      "</div>";
+    // for every key, concatenate an `<h4 />`/`<div />` pairing of the key name and its value,
     // and append it to the `result` string created at the start.
   }
   return result; // once the looping is done, `result` will be one long string to put in the email body
 }
-
 
 function formatNameProperly(name) {
   return name
@@ -468,7 +464,6 @@ function formatNameProperly(name) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
-
 
 function getNumeroPezziConOpenAI(prompt) {
   const apiKey = getOpenAIKey();
@@ -530,18 +525,16 @@ function getNumeroPezziConOpenAI(prompt) {
   }
 }
 
-
 function getWorkingDaysInRange(start, end) {
-    let days = 0;
-    const d = new Date(start);
-    while (d <= end) {
-      const day = d.getDay();
-      if (day >= 1 && day <= 5) days++;
-      d.setDate(d.getDate() + 1);
-    }
-    return Math.max(days, 1);
+  let days = 0;
+  const d = new Date(start);
+  while (d <= end) {
+    const day = d.getDay();
+    if (day >= 1 && day <= 5) days++;
+    d.setDate(d.getDate() + 1);
   }
-
+  return Math.max(days, 1);
+}
 
 function isAlreadyAssigned(row, colsMain, vendorData, colsVendor) {
   var nomeCliente = row[colsMain["Nome"]].toString().trim().toLowerCase();
@@ -561,7 +554,6 @@ function isAlreadyAssigned(row, colsMain, vendorData, colsVendor) {
   });
 }
 
-
 function isDuplicateEntry(sheet, requestData, colsMain) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -576,12 +568,10 @@ function isDuplicateEntry(sheet, requestData, colsMain) {
   return false;
 }
 
-
 function normalizzaData(val) {
-    // Se mancante/illeggibile, assegna la data di oggi per coerenza dei KPI temporali
-    return parseCustomDate(val) || stripTime(today);
-  }
-
+  // Se mancante/illeggibile, assegna la data di oggi per coerenza dei KPI temporali
+  return parseCustomDate(val) || stripTime(today);
+}
 
 function notifyAssignment(
   venditore,
@@ -695,16 +685,14 @@ function notifyAssignment(
   }
 }
 
-
 function parseCustomDate(val) {
-    if (val instanceof Date && !isNaN(val)) return stripTime(val);
-    if (typeof val === "string" && val.trim() !== "") {
-      const parsed = new Date(val);
-      if (!isNaN(parsed)) return stripTime(parsed);
-    }
-    return null;
+  if (val instanceof Date && !isNaN(val)) return stripTime(val);
+  if (typeof val === "string" && val.trim() !== "") {
+    const parsed = new Date(val);
+    if (!isNaN(parsed)) return stripTime(parsed);
   }
-
+  return null;
+}
 
 function pulisciFogli() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -730,7 +718,6 @@ function pulisciFogli() {
     .clearFormat();
 }
 
-
 function record_data(e) {
   Logger.log(JSON.stringify(e)); // log the POST data in case we need to debug it
   try {
@@ -755,17 +742,14 @@ function record_data(e) {
   }
 }
 
-
 function resetLastProcessedRow() {
   PropertiesService.getScriptProperties().deleteProperty("lastProcessedRow");
   Logger.log("🔄 Ultima riga elaborata resettata!");
 }
 
-
 function safeDiv(a, b) {
-    return b > 0 ? a / b : 0;
-  }
-
+  return b > 0 ? a / b : 0;
+}
 
 function sendPersistentReminders() {
   var vendors = getVendors();
@@ -865,7 +849,6 @@ function sendPersistentReminders() {
   }
 }
 
-
 function sendReminderForUncontactedClients() {
   var vendors = getVendors();
   var today = new Date();
@@ -938,21 +921,18 @@ function sendReminderForUncontactedClients() {
   }
 }
 
-
 function sortPeriodKeys(a, b) {
-    // Ordina "YYYY-XX" correttamente
-    const [ya, xa] = a.split("-").map(Number);
-    const [yb, xb] = b.split("-").map(Number);
-    return ya === yb ? xa - xb : ya - yb;
-  }
-
+  // Ordina "YYYY-XX" correttamente
+  const [ya, xa] = a.split("-").map(Number);
+  const [yb, xb] = b.split("-").map(Number);
+  return ya === yb ? xa - xb : ya - yb;
+}
 
 function testEstrazionePezzi() {
   const messaggio = "Vorrei 3 finestre, una porta finestra e due persiane.";
   const numero = getNumeroPezziConOpenAI(messaggio);
   Logger.log("🧪 Numero rilevato: " + numero);
 }
-
 
 function testRowCount() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();

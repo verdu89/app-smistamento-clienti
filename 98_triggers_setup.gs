@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 function creaTriggerBenvenuti() {
   ScriptApp.newTrigger("inviaBenvenutiWhatsApp")
     .timeBased()
@@ -12,7 +11,6 @@ function creaTriggerBenvenuti() {
 
   Logger.log("✅ Trigger creato: inviaBenvenutiWhatsApp ogni 15 minuti");
 }
-
 
 function createOnEditTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
@@ -34,6 +32,14 @@ function createOnEditTrigger() {
   Logger.log("✅ Trigger 'onEditInstalled' creato con successo!");
 }
 
+function createOnEditTrigger() {
+  ScriptApp.newTrigger("onEditInstalled")
+    .forSpreadsheet(SpreadsheetApp.getActive())
+    .onEdit()
+    .create();
+
+  Logger.log("✅ Trigger onEditInstalled creato correttamente!");
+}
 
 function createTriggerCheckForNewRequests() {
   // Cancella eventuali duplicati
@@ -50,7 +56,6 @@ function createTriggerCheckForNewRequests() {
     .create();
 }
 
-
 function setupDailyReminderTrigger() {
   ScriptApp.newTrigger("sendPersistentReminders")
     .timeBased()
@@ -59,7 +64,6 @@ function setupDailyReminderTrigger() {
     .create();
   Logger.log("✅ Trigger per il promemoria giornaliero creato.");
 }
-
 
 function setupDashboardFridayTrigger() {
   const triggers = ScriptApp.getProjectTriggers();
@@ -83,7 +87,6 @@ function setupDashboardFridayTrigger() {
   );
 }
 
-
 function setupEmailProcessingTrigger() {
   ScriptApp.newTrigger("processEmailQueue")
     .timeBased()
@@ -92,14 +95,12 @@ function setupEmailProcessingTrigger() {
   Logger.log("✅ Trigger per svuotare la coda email creato.");
 }
 
-
 function setupProgramTrigger() {
   ScriptApp.newTrigger("avviaProgramma")
     .timeBased()
     .everyMinutes(10) // Esegue ogni 10 minuti (puoi personalizzarlo)
     .create();
 }
-
 
 function setupReminderTrigger() {
   ScriptApp.newTrigger("sendReminderForUncontactedClients")
@@ -109,7 +110,6 @@ function setupReminderTrigger() {
     .create();
   Logger.log("✅ Trigger per il promemoria venditori creato.");
 }
-
 
 function setupWeeklyReportTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
@@ -127,4 +127,25 @@ function setupWeeklyReportTrigger() {
     .create();
 
   Logger.log("✅ Trigger per il riepilogo settimanale creato con successo!");
+}
+
+function createAutoCloseTrigger() {
+  ScriptApp.newTrigger("autoCloseOldQuotes").timeBased().everyDays(7).create();
+
+  Logger.log("✅ Trigger settimanale creato per autoCloseOldQuotes()");
+}
+
+function forceInstallMainOnEditTrigger() {
+  const functionName = "onEditInstalled_Main";
+  const ss = SpreadsheetApp.getActive();
+
+  // ✅ Ricreo il trigger corretto
+  ScriptApp.newTrigger(functionName).forSpreadsheet(ss).onEdit().create();
+
+  Logger.log(
+    "✅ Trigger reinstallato per " +
+      functionName +
+      " sul foglio " +
+      ss.getName()
+  );
 }

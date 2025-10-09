@@ -3,7 +3,6 @@
  * Keep functions unchanged; moved only for organization.
  */
 
-
 // === Canonical helpers (deduped) ===
 function findFieldValue(fieldData, options) {
   if (!fieldData || fieldData.length === 0) return "";
@@ -33,7 +32,9 @@ function findFieldValue(fieldData, options) {
   }
 
   // 2) fallback: include tutte le parole chiave indicate
-  const must = (options && options.mustInclude ? options.mustInclude : []).map(normalize);
+  const must = (options && options.mustInclude ? options.mustInclude : []).map(
+    normalize
+  );
   for (const fd of fieldData) {
     const n = normalize(fd.name || "");
     if (must.length > 0 && must.every((tok) => n.includes(tok))) {
@@ -75,7 +76,6 @@ function md5Hex_(str) {
 
 // === Moved utility helpers (paste originals below, unchanged) ===
 
-
 function applyDropdownIfColumnExists(sheet, columnName, values, colors = null) {
   var headers = sheet.getDataRange().getValues()[0]; // Legge le intestazioni
   var colIndex = headers.indexOf(columnName); // Trova la posizione della colonna
@@ -114,36 +114,34 @@ function applyDropdownIfColumnExists(sheet, columnName, values, colors = null) {
   );
 }
 
+function applyDropdownValidation(sheet, colIndex, values, colors, row) {
+  var range;
 
-function applyDropdownValidation(
-  sheet,
-  colIndex,
-  values,
-  colors = null,
-  lastRow = null
-) {
-  if (lastRow === null) {
-    lastRow = sheet.getLastRow();
+  // Se passo la riga, applico SOLO alla cella
+  if (row) {
+    range = sheet.getRange(row, colIndex + 1);
+  } else {
+    // Altrimenti applico a tutta la colonna
+    range = sheet.getRange(2, colIndex + 1, sheet.getLastRow() - 1);
   }
-  if (lastRow < 2) return;
 
-  var range = sheet.getRange(lastRow, colIndex + 1, 1, 1);
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(false)
     .build();
+
   range.setDataValidation(rule);
 
+  // Se vogliamo colorare le celle in base al valore
   if (colors) {
-    var cellValue = range.getValue().toString().trim();
-    if (cellValue in colors) {
-      range.setBackground(colors[cellValue]);
+    var val = range.getValue().toString().trim();
+    if (colors[val]) {
+      range.setBackground(colors[val]);
     } else {
-      range.setBackground("#FFFFFF");
+      range.setBackground(null); // Reset se non corrisponde
     }
   }
 }
-
 
 function applyUpdates(sheet, updates, colsMain) {
   updates.forEach((update) => {
@@ -158,7 +156,6 @@ function applyUpdates(sheet, updates, colsMain) {
   });
 }
 
-
 function autoResizeAllColumns_(sheet) {
   const lastCol = sheet.getLastColumn();
   for (let c = 1; c <= lastCol; c++) {
@@ -166,23 +163,19 @@ function autoResizeAllColumns_(sheet) {
   }
 }
 
-
 function countInMap(map, key) {
-    return map[key] || 0;
-  }
-
+  return map[key] || 0;
+}
 
 function dateInRange(d, start, end) {
-    return d >= stripTime(start) && d <= stripTime(end);
-  }
-
+  return d >= stripTime(start) && d <= stripTime(end);
+}
 
 function extractEmailFromText_(t) {
   if (!t) return "";
   const m = t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return m ? m[0] : "";
 }
-
 
 function extractPhones_(t) {
   if (!t) return [];
@@ -193,16 +186,13 @@ function extractPhones_(t) {
   return digits.map((x) => x.replace(/\D+/g, ""));
 }
 
-
 function fmtDate(d) {
-    return Utilities.formatDate(d, Session.getScriptTimeZone(), "dd/MM/yyyy");
-  }
-
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), "dd/MM/yyyy");
+}
 
 function fmtPerc(n) {
-    return isFinite(n) ? (n * 100).toFixed(1) + "%" : "-";
-  }
-
+  return isFinite(n) ? (n * 100).toFixed(1) + "%" : "-";
+}
 
 function getColumnIndexes(headerRow) {
   if (!headerRow || headerRow.length === 0) {
@@ -219,7 +209,6 @@ function getColumnIndexes(headerRow) {
   Logger.log("📊 Indici colonne trovati: " + JSON.stringify(indexes));
   return indexes;
 }
-
 
 function getFirstEmptyRow(sheet) {
   if (!sheet) {
@@ -242,12 +231,10 @@ function getFirstEmptyRow(sheet) {
   return lastRow + 1; // Se non ci sono righe completamente vuote, ritorna la successiva
 }
 
-
 function getVal(row, key) {
-    const idx = cols[key];
-    return typeof idx === "number" && idx >= 0 ? row[idx] : "";
-  }
-
+  const idx = cols[key];
+  return typeof idx === "number" && idx >= 0 ? row[idx] : "";
+}
 
 function isSimilarText_(a, b) {
   // similarità “leggera”: uno contiene l’altro per almeno 30 caratteri
@@ -260,14 +247,12 @@ function isSimilarText_(a, b) {
   );
 }
 
-
 function isValidEmail_(email) {
   if (!email || typeof email !== "string") return false;
   const e = email.trim();
   // regex semplice e robusta per casi comuni
   return !!e.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
 }
-
 
 function normalizeBody_(text) {
   let t = text
@@ -282,16 +267,14 @@ function normalizeBody_(text) {
   return t;
 }
 
-
 function normalizePhone(tel) {
-    if (!tel) return "";
-    let clean = String(tel).replace(/\D/g, ""); // toglie tutto tranne cifre
-    if (clean.startsWith("39") && clean.length > 10) {
-      clean = clean.substring(2); // rimuove prefisso internazionale
-    }
-    return clean;
+  if (!tel) return "";
+  let clean = String(tel).replace(/\D/g, ""); // toglie tutto tranne cifre
+  if (clean.startsWith("39") && clean.length > 10) {
+    clean = clean.substring(2); // rimuove prefisso internazionale
   }
-
+  return clean;
+}
 
 function normalizePhone_(p) {
   if (!p) return "";
@@ -301,7 +284,6 @@ function normalizePhone_(p) {
     digits = digits.slice(digits.length - 10);
   return digits;
 }
-
 
 function normalizeTextForCompare_(text) {
   return (text || "")
@@ -313,18 +295,15 @@ function normalizeTextForCompare_(text) {
     .toLowerCase();
 }
 
-
 function safeSetIfColumnExists_(sheet, cols, colName, rowIndex, value) {
   if (cols && colName in cols) {
     sheet.getRange(rowIndex, cols[colName] + 1).setValue(value);
   }
 }
 
-
 function stripTime(d) {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  }
-
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 function tryParseDate(value) {
   if (value instanceof Date && !isNaN(value)) return value;
@@ -369,18 +348,16 @@ function tryParseDate(value) {
   return null;
 }
 
-
 function weekKeyToDate(year, week) {
-    // Ritorna il lunedì di quella settimana ISO
-    const simple = new Date(year, 0, 1 + (week - 1) * 7);
-    const dow = simple.getDay();
-    const ISOweekStart = new Date(simple);
-    const diff =
-      dow <= 4 ? simple.getDate() - dow + 1 : simple.getDate() + 8 - dow;
-    ISOweekStart.setDate(diff);
-    return stripTime(ISOweekStart);
-  }
-
+  // Ritorna il lunedì di quella settimana ISO
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dow = simple.getDay();
+  const ISOweekStart = new Date(simple);
+  const diff =
+    dow <= 4 ? simple.getDate() - dow + 1 : simple.getDate() + 8 - dow;
+  ISOweekStart.setDate(diff);
+  return stripTime(ISOweekStart);
+}
 
 function writeToLogSheet(type, message) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -394,4 +371,124 @@ function writeToLogSheet(type, message) {
   if (numRows > maxRows) {
     logSheet.deleteRows(2, numRows - maxRows);
   }
+}
+
+function autoCloseOldQuotes() {
+  Logger.log(
+    "🚀 Avvio autoCloseOldQuotes() - chiusura automatica preventivi oltre 60 giorni..."
+  );
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var mainSheet = ss.getSheetByName("Main");
+  if (!mainSheet) {
+    Logger.log("❌ Foglio Main non trovato!");
+    return;
+  }
+
+  var data = mainSheet.getDataRange().getValues();
+  var cols = getColumnIndexes(data[0]);
+
+  if (
+    !("Data Preventivo" in cols) ||
+    !("Vendita Conclusa?" in cols) ||
+    !("Stato" in cols)
+  ) {
+    Logger.log("❌ Mancano Data Preventivo, Vendita Conclusa? o Stato");
+    return;
+  }
+
+  var today = new Date();
+  var changed = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var dataPrevRaw = row[cols["Data Preventivo"]];
+    var stato = row[cols["Stato"]] || "";
+    var venditaConclusa = row[cols["Vendita Conclusa?"]] || "";
+
+    var dataPrev = parseFlexibleDate(dataPrevRaw);
+    if (!dataPrev) continue; // Salta se non leggibile
+
+    var diffGiorni = Math.floor((today - dataPrev) / (1000 * 60 * 60 * 24));
+
+    if (
+      diffGiorni > 60 &&
+      stato.toLowerCase() !== "in trattativa" &&
+      venditaConclusa !== "NO" &&
+      venditaConclusa !== "SI"
+    ) {
+      Logger.log(
+        `⚠️ Riga ${
+          i + 1
+        } scaduta (${diffGiorni} giorni) → Imposto Vendita Conclusa = NO`
+      );
+
+      var cell = mainSheet.getRange(i + 1, cols["Vendita Conclusa?"] + 1);
+      cell.setValue("NO");
+
+      if (`_last_update_Vendita Conclusa?` in cols) {
+        mainSheet
+          .getRange(i + 1, cols[`_last_update_Vendita Conclusa?`] + 1)
+          .setValue(new Date());
+      }
+
+      applyDropdownValidation(
+        mainSheet,
+        cols["Vendita Conclusa?"],
+        ["SI", "NO"],
+        { SI: "#00FF00", NO: "#FF0000" },
+        i + 1
+      );
+
+      changed++;
+    }
+  }
+
+  Logger.log(
+    `✅ autoCloseOldQuotes() completato. Totale righe aggiornate: ${changed}`
+  );
+}
+
+/**
+ * Legge una data in qualsiasi formato tra quelli elencati.
+ * - Oggetti Date
+ * - Formati JS tipo "Mon Mar 17 2025 00:00:00 GMT+0100"
+ * - Formati "dd/mm/yyyy" o "dd/mm/yy"
+ * - Formati "dd/mm" → interpretati come ANNO CORRENTE
+ */
+function parseFlexibleDate(value) {
+  if (!value) return null;
+
+  // Caso 1: È già un oggetto Date valido
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value)
+  ) {
+    return value;
+  }
+
+  // Caso 2: Stringa tipo "Mon Mar 17 2025..."
+  var parsed = new Date(value);
+  if (!isNaN(parsed)) return parsed;
+
+  // Caso 3: Formato "dd/mm/yyyy" o "dd/mm/yy"
+  var m = String(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    var day = parseInt(m[1], 10);
+    var month = parseInt(m[2], 10) - 1;
+    var year =
+      m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10);
+    return new Date(year, month, day);
+  }
+
+  // Caso 4: Formato "dd/mm" → ANNO CORRENTE
+  var m2 = String(value).match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (m2) {
+    var day2 = parseInt(m2[1], 10);
+    var month2 = parseInt(m2[2], 10) - 1;
+    var now = new Date();
+    return new Date(now.getFullYear(), month2, day2);
+  }
+
+  return null;
 }
