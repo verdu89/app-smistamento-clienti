@@ -49,10 +49,11 @@ function createTriggerCheckForNewRequests() {
     }
   });
 
-  // Crea un trigger che gira ogni 5 minuti
+  // Crea un trigger che gira ogni giorno alle 17:00
   ScriptApp.newTrigger("checkForNewRequests")
     .timeBased()
-    .everyMinutes(5)
+    .atHour(17)
+    .everyDays(1)
     .create();
 }
 
@@ -148,4 +149,28 @@ function forceInstallMainOnEditTrigger() {
       " sul foglio " +
       ss.getName()
   );
+}
+
+function creaTriggerImportaLeads() {
+  ScriptApp.newTrigger("importaLeadDaMetaNuovi")
+    .timeBased()
+    .everyMinutes(15)
+    .create();
+}
+
+function creaTriggerRecensioniWhatsApp() {
+  // Elimina eventuali trigger duplicati
+  const allTriggers = ScriptApp.getProjectTriggers();
+  for (const t of allTriggers) {
+    if (t.getHandlerFunction() === "inviaRecensioniWhatsApp") {
+      ScriptApp.deleteTrigger(t);
+    }
+  }
+
+  // Crea il trigger giornaliero alle 17:00
+  ScriptApp.newTrigger("inviaRecensioniWhatsApp")
+    .timeBased()
+    .atHour(17) // ore 17
+    .everyDays(1) // una volta al giorno
+    .create();
 }

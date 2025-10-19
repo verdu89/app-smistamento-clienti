@@ -257,7 +257,7 @@ function getProvinceToVendor() {
 function getVendorEmail(venditore) {
   var vendorEmails = {
     "Mircko Manconi": "mirckox@yahoo.it",
-    "Cristian Piga": "xxcristianpiga@me.com",
+    "Cristian Piga": "cristianpiga@me.com",
     "Marco Guidi": "guidi.marco0308@libero.it",
   };
   return vendorEmails[venditore] || "newsaverplast@gmail.com";
@@ -746,7 +746,13 @@ function syncMainToVendors() {
       if (hasDataAssegnazioneCol && !row[colsMain["Data Assegnazione"]]) {
         mainSheet
           .getRange(i + 1, colsMain["Data Assegnazione"] + 1)
-          .setValue(new Date());
+          .setValue(
+            Utilities.formatDate(
+              new Date(),
+              Session.getScriptTimeZone(),
+              "dd/MM/yyyy HH:mm"
+            )
+          );
       }
 
       // Scrivi "Data e ora" se vuota (come nella vecchia) – se la colonna esiste

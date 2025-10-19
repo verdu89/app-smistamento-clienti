@@ -145,28 +145,45 @@ function checkForNewRequests() {
   const idxData = headers.indexOf("Data richiesta recensione");
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][idxRichiesta] === true && data[i][idxData] === "") {
+    // ✅ Controllo robusto su valori vuoti
+    const richiestaRecensione = data[i][idxRichiesta];
+    const dataInvio = data[i][idxData];
+    if (
+      richiestaRecensione === true &&
+      (!dataInvio || dataInvio.toString().trim() === "")
+    ) {
       const rawNomeCliente = data[i][idxNome] || "Cliente";
       const nomeCliente = formatNameProperly(rawNomeCliente.toString().trim());
 
       const telefono = data[i][idxTelefono] || "";
       const email = data[i][idxEmail];
-
       if (!email) continue;
 
-      // Se vuoi, puoi passare anche il telefono all'email
-      const { subject, body } = buildReviewEmail(nomeCliente, telefono); // <-- solo se modifichi la funzione
+      const { subject, body } = buildReviewEmail(nomeCliente, telefono);
+
       const result = sendEmail(email, subject, body);
 
-      // ✅ Se la manutenzione blocca l’invio, NON scrivere la data
-      if (!result || result.maintenance === true || result.ok === false) {
-        continue; // passa alla prossima riga senza scrivere nulla
+      // ⏸ Se manutenzione → non scrivere nulla
+      if (result?.maintenance === true) {
+        Logger.log(
+          "⏸ Email bloccata da manutenzione, non aggiorno data per sicurezza per: " +
+            email
+        );
+        continue;
       }
 
-      // ✅ Solo se effettivamente inviato, aggiorna la data
+      // ✅ Se arriviamo qui → consideriamo inviata e segniamo la data
       sheet
         .getRange(i + 1, idxData + 1)
-        .setValue(new Date().toLocaleDateString());
+        .setValue(
+          Utilities.formatDate(
+            new Date(),
+            Session.getScriptTimeZone(),
+            "dd/MM/yyyy HH:mm"
+          )
+        );
+
+      Logger.log("✅ Data aggiornata per: " + email);
     }
   }
 }

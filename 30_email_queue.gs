@@ -88,13 +88,17 @@ function processEmailQueue() {
 function sendEmail(to, subject, body) {
   try {
     const res = safeSendEmail_(to, subject, body);
+
     if (res && res.maintenance) {
       logWarning("📧 Bloccata da manutenzione: " + to + " — " + subject);
-      return;
+      return { ok: false, maintenance: true }; // ✅ ritorno chiaro
     }
+
     logInfo("📧 Email inviata a " + to);
+    return { ok: true }; // ✅ ritorno chiaro
   } catch (e) {
     logError("❌ Errore nell'invio email a " + to + ": " + e.message);
     addToEmailQueue(to, subject, body);
+    return { ok: false, error: true }; // ✅ ritorno chiaro
   }
 }

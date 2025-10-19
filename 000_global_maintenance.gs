@@ -56,24 +56,63 @@ function setMaintenanceIndicators_(on) {
 
 /** Wrapper sicuro per email (nessun alert / toast) */
 function safeSendEmail_(payloadOrTo, subject, body) {
+  const callerStack = (new Error().stack || "").toString();
+
+  // ✅ Lista di funzioni autorizzate a inviare email ANCHE in manutenzione
+  const allowedDuringMaintenance = [
+    "importaLeadDaMetaNuovi", // <-- puoi aggiungere altre funzioni se necessario empio "nomefunzione"
+  ];
+
   if (isMaintenanceOn_()) {
-    Logger.log(maintenanceMessage_());
-    return { ok: false, maintenance: true, message: maintenanceMessage_() };
+    const isAllowed = allowedDuringMaintenance.some((fn) =>
+      callerStack.includes(fn)
+    );
+    if (!isAllowed) {
+      Logger.log(maintenanceMessage_());
+      return { ok: false, maintenance: true, message: maintenanceMessage_() };
+    } else {
+      Logger.log(
+        "✅ Bypass manutenzione email per: " +
+          allowedDuringMaintenance.find((fn) => callerStack.includes(fn))
+      );
+    }
   }
+
+  // ✅ Invio email invariato (con supporto a payload object oppure parametri singoli)
   if (typeof payloadOrTo === "object") {
     MailApp.sendEmail(payloadOrTo);
   } else {
     MailApp.sendEmail({ to: payloadOrTo, subject: subject, htmlBody: body });
   }
+
   return { ok: true };
 }
 
 /** Wrapper sicuro per chiamate HTTP (nessun alert / toast) */
 function safeFetch_(url, options) {
+  const callerStack = (new Error().stack || "").toString();
+
+  // ✅ Lista di funzioni autorizzate a funzionare anche in manutenzione
+  const allowedDuringMaintenance = [
+    "importaLeadDaMetaNuovi", // <-- Qui puoi aggiungere altre funzioni future esempio "nomefunzione"
+  ];
+
   if (isMaintenanceOn_()) {
-    Logger.log(maintenanceMessage_());
-    throw new Error(maintenanceMessage_());
+    const isAllowed = allowedDuringMaintenance.some((fn) =>
+      callerStack.includes(fn)
+    );
+
+    if (!isAllowed) {
+      Logger.log(maintenanceMessage_());
+      throw new Error(maintenanceMessage_());
+    } else {
+      Logger.log(
+        "✅ Bypass manutenzione per: " +
+          allowedDuringMaintenance.find((fn) => callerStack.includes(fn))
+      );
+    }
   }
+
   return UrlFetchApp.fetch(url, options);
 }
 
